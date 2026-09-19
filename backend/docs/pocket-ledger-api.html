@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pocket Ledger 接口文档</title>
+  <style>
+
+    :root {
+      --header: #32363a;
+      --text: #393838;
+      --title: #2c3e50;
+      --muted: #777;
+      --line: #ddd;
+      --soft: #f6f6f6;
+      --accent: #59d69d;
+      --accent-dark: #24a66f;
+      --code: #fee9cc;
+      --sidebar: 270px;
+    }
+
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      color: var(--text);
+      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.75;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, .08); }
+    ::-webkit-scrollbar-thumb { border-radius: 4px; background: rgba(0, 0, 0, .22); }
+
+    a, a:visited { color: #34495e; text-decoration: none; }
+    a:hover, a:focus { color: var(--accent-dark); }
+    code, pre { font-family: Monaco, Consolas, "Courier New", monospace; }
+    code {
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: rgba(0, 0, 0, .76);
+      background: var(--code);
+      font-size: 12px;
+    }
+    pre {
+      overflow-x: auto;
+      margin: 10px 0 18px;
+      padding: 14px;
+      border: 1px solid #d9d9d9;
+      background: var(--soft);
+      color: #666;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+    pre code { padding: 0; color: inherit; background: transparent; font-size: inherit; }
+
+    .m-header {
+      position: fixed;
+      z-index: 20;
+      top: 0;
+      right: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      height: 56px;
+      padding: 0 32px 0 60px;
+      color: #fff;
+      background: var(--header);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: var(--accent-dark);
+      background: linear-gradient(#fff, #f2f2f2);
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .m-header .title {
+      margin: 0 0 0 16px;
+      padding: 0;
+      border: 0;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 400;
+      line-height: 56px;
+    }
+    .m-header .meta { margin-left: auto; color: #d7dddf; font-size: 13px; }
+
+    .g-doc { display: flex; padding-top: 56px; }
+    .table-of-contents {
+      position: fixed;
+      top: 56px;
+      bottom: 0;
+      left: 0;
+      width: var(--sidebar);
+      overflow: auto;
+      padding: 24px 18px 40px;
+      border-right: 1px solid #eee;
+      background: #fff;
+    }
+    .toc-title { margin: 0 0 14px; color: #111; font-size: 24px; line-height: 1.3; }
+    .toc-summary { margin: 0 0 20px; color: #888; }
+    .table-of-contents ul { margin: 0; padding: 0; list-style: none; }
+    .table-of-contents > ul > li { margin: 16px 0; }
+    .table-of-contents > ul > li > a { display: block; font-size: 18px; }
+    .table-of-contents ul ul { margin-top: 7px; padding-left: 12px; border-left: 1px solid #ececec; }
+    .table-of-contents ul ul li { margin: 3px 0; }
+    .table-of-contents ul ul a { display: block; padding: 2px 6px; border-radius: 3px; }
+    .table-of-contents ul ul a:hover { background: #effbf5; }
+
+    .content-right {
+      width: min(860px, calc(100vw - var(--sidebar) - 88px));
+      margin-left: calc(var(--sidebar) + 70px);
+      padding: 32px 0 64px;
+    }
+    h1, h2, h3, h4 { color: #404040; font-weight: 400; }
+    h1 {
+      margin: 52px 0 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--title);
+      font-size: 30px;
+      line-height: 1.5;
+      scroll-margin-top: 72px;
+    }
+    .curproject-name { margin-top: 0; font-size: 42px; font-weight: 600; }
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 36px 0 12px;
+      font-size: 25px;
+      line-height: 1.45;
+      scroll-margin-top: 72px;
+    }
+    h3 {
+      clear: both;
+      margin: 20px 0 12px;
+      padding-left: 8px;
+      border-left: 3px solid var(--accent);
+      font-size: 18px;
+      line-height: 1.5;
+    }
+    p { margin: 0 0 9px; padding-left: 10px; }
+    strong { color: #333; }
+
+    .lead {
+      margin: 0 0 20px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--accent);
+      background: #f5fcf8;
+      color: #44524b;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 18px;
+      margin: 12px 0 20px;
+      padding: 14px 16px;
+      border: 1px solid #e2e8e5;
+      background: #fbfdfc;
+    }
+    .info-grid p { margin: 0; padding: 0; }
+    .endpoint { padding-top: 1px; }
+    .method {
+      display: inline-block;
+      min-width: 58px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 21px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .get { background: #1e88e5; }
+    .post { background: #2ea66f; }
+    .put { background: #e39223; }
+    .delete { background: #d95050; }
+    .auth-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 0 7px;
+      border: 1px solid #edc36b;
+      border-radius: 10px;
+      color: #8a5a00;
+      background: #fff7df;
+      font-size: 11px;
+    }
+
+    .table-wrap { max-width: 100%; overflow-x: auto; }
+    table {
+      width: 100%;
+      margin: 10px 0 18px;
+      border-collapse: collapse;
+      background: #fff;
+    }
+    th, td { padding: 6px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #fafafa; color: #333; font-weight: 600; white-space: nowrap; }
+    td:first-child { white-space: nowrap; }
+    .nested-1 { padding-left: 25px; }
+    .nested-2 { padding-left: 45px; }
+    .tree { color: #8c8a8a; }
+    .required { color: #cf3f3f; }
+    .optional { color: #777; }
+    .note {
+      margin: 10px 0 18px;
+      padding: 10px 14px;
+      border: 1px solid #f0dfaa;
+      border-radius: 3px;
+      background: #fffaf0;
+    }
+    .error-table td:first-child { font-weight: 600; }
+    .m-footer { margin-top: 54px; padding: 18px 0; border-top: 1px solid var(--line); color: #888; }
+    .m-footer p { padding: 0; }
+    .back-top { position: fixed; right: 22px; bottom: 22px; padding: 7px 11px; border-radius: 4px; background: var(--header); color: #fff !important; opacity: .78; }
+
+    @media (max-width: 900px) {
+      :root { --sidebar: 220px; }
+      .m-header { padding-left: 20px; }
+      .content-right { width: calc(100vw - var(--sidebar) - 40px); margin-left: calc(var(--sidebar) + 24px); }
+    }
+    @media (max-width: 680px) {
+      .m-header { position: static; padding: 0 14px; }
+      .m-header .meta { display: none; }
+      .g-doc { display: block; padding-top: 0; }
+      .table-of-contents { position: static; width: 100%; max-height: none; border-right: 0; border-bottom: 1px solid #eee; }
+      .content-right { width: auto; margin: 0; padding: 24px 16px 50px; }
+      .curproject-name { font-size: 32px; }
+      h1 { margin-top: 38px; font-size: 26px; }
+      h2 { align-items: flex-start; flex-wrap: wrap; font-size: 22px; }
+      .info-grid { grid-template-columns: 1fr; }
+      .back-top { display: none; }
+    }
+    @media print {
+      .m-header, .table-of-contents, .back-top { display: none; }
+      .g-doc { padding: 0; }
+      .content-right { width: 100%; margin: 0; padding: 0; }
+      table, pre, .endpoint { page-break-inside: avoid; }
+      h1, h2, h3 { color: #000; }
+    }
+  </style>
+</head>
+<body id="top">
+  <header class="m-header">
+    <span class="brand-mark">PL</span>
+    <h1 class="title">YAPI 风格接口文档</h1>
+    <span class="meta">Pocket Ledger · Java / Spring Boot</span>
+  </header>
+
+  <div class="g-doc">
+    <nav class="table-of-contents" aria-label="接口目录">
+      <h2 class="toc-title">Pocket Ledger</h2>
+      <p class="toc-summary">9 个业务接口 · 1 个健康检查</p>
+      <ul>
+        <li><a href="#overview">接口概览</a>
+          <ul><li><a href="#health">健康检查</a></li></ul>
+        </li>
+        <li><a href="#auth-apis">认证相关接口</a>
+          <ul>
+            <li><a href="#register">用户注册</a></li>
+            <li><a href="#login">用户登录</a></li>
+            <li><a href="#me">获取当前用户</a></li>
+          </ul>
+        </li>
+        <li><a href="#category-apis">分类相关接口</a>
+          <ul><li><a href="#category-list">查询分类列表</a></li></ul>
+        </li>
+        <li><a href="#bill-apis">账单相关接口</a>
+          <ul>
+            <li><a href="#bill-add">新增账单</a></li>
+            <li><a href="#bill-list">账单分页查询</a></li>
+            <li><a href="#bill-detail">查询账单详情</a></li>
+            <li><a href="#bill-update">更新账单</a></li>
+            <li><a href="#bill-delete">批量删除账单</a></li>
+          </ul>
+        </li>
+        <li><a href="#common-errors">通用错误</a></li>
+      </ul>
+    </nav>
+
+    <main id="right" class="content-right">
+      <h1 class="curproject-name">Pocket Ledger 接口文档</h1>
+      <p class="lead">本文档沿用原接口契约，适配当前 Java 项目与既有数据库。除健康检查外，成功响应使用统一的 <code>ApiResponse</code> JSON 包装。账单接口为开发目标，完整参考实现位于 <a href="bill-crud-reference/README.md">bill-crud-reference</a>，尚需按<a href="2026-09-06-bill-crud-development-guide.md">开发书</a>合并到项目 src 后运行。</p>
+
+      <section id="overview">
+        <h1>接口概览</h1>
+        <div class="info-grid">
+          <p><strong>Java 默认 Base URL：</strong><code>http://localhost:8080</code>（以实际 server.port 为准）</p>
+          <p><strong>数据格式：</strong><code>application/json</code></p>
+          <p><strong>认证方式：</strong><code>Authorization: Bearer &lt;JWT&gt;</code></p>
+          <p><strong>令牌有效期：</strong>24 小时</p>
+        </div>
+
+        <h3>统一成功响应</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>备注</th></tr></thead>
+          <tbody>
+            <tr><td>code</td><td>integer</td><td>必须</td><td>200</td><td>业务状态码；成功固定为 200</td></tr>
+            <tr><td>message</td><td>string</td><td>必须</td><td>操作成功</td><td>结果说明</td></tr>
+            <tr><td>data</td><td>any | null</td><td>非必须</td><td>null</td><td>接口返回的数据</td></tr>
+          </tbody>
+        </table></div>
+        <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": {}
+}</code></pre>
+
+        <article id="health" class="endpoint">
+          <h2><span class="method get">GET</span> 健康检查</h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/</code></p>
+          <p><strong>Method：</strong> GET</p>
+          <p><strong>接口描述：</strong>检查 API 服务是否可访问。此接口不使用统一响应包装。</p>
+          <h3>请求参数</h3>
+          <p>无。</p>
+          <h3>返回数据</h3>
+          <pre><code>{
+  "message": "Hello World"
+}</code></pre>
+        </article>
+      </section>
+
+      <section id="auth-apis">
+        <h1>认证相关接口</h1>
+
+        <article id="register" class="endpoint">
+          <h2><span class="method post">POST</span> 用户注册</h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/auth/register</code></p>
+          <p><strong>Method：</strong> POST</p>
+          <p><strong>接口描述：</strong>创建新用户账号；用户名不可重复。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>Content-Type</td><td>application/json</td><td>是</td><td>application/json</td><td>请求体格式</td></tr></tbody>
+          </table></div>
+          <p><strong>Body</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>备注</th><th>其他信息</th></tr></thead>
+            <tbody>
+              <tr><td>username</td><td>string</td><td class="required">必须</td><td>—</td><td>用户名</td><td>去除首尾空白；长度 2–50</td></tr>
+              <tr><td>password</td><td>string</td><td class="required">必须</td><td>—</td><td>密码</td><td>去除首尾空白；长度 8–64</td></tr>
+            </tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>注册成功</td></tr>
+              <tr><td>data</td><td>object</td><td>必须</td><td>注册用户</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> id</td><td>integer</td><td>必须</td><td>用户 ID</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> username</td><td>string</td><td>必须</td><td>用户名</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "注册成功",
+  "data": { "id": 1, "username": "reed" }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>409</td><td>用户名已被占用</td><td>用户名已经存在</td></tr>
+              <tr><td>422</td><td>参数错误：…</td><td>字段缺失或长度不符合要求</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="login" class="endpoint">
+          <h2><span class="method post">POST</span> 用户登录</h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/auth/login</code></p>
+          <p><strong>Method：</strong> POST</p>
+          <p><strong>接口描述：</strong>使用用户名与密码换取 JWT。成功后在需要认证的接口中携带 Bearer Token。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>Content-Type</td><td>application/json</td><td>是</td><td>application/json</td><td>请求体格式</td></tr></tbody>
+          </table></div>
+          <p><strong>Body</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>username</td><td>string</td><td class="required">必须</td><td>—</td><td>用户名</td></tr>
+              <tr><td>password</td><td>string</td><td class="required">必须</td><td>—</td><td>密码</td></tr>
+            </tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td><td>业务状态码</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>操作成功</td><td>结果说明</td></tr>
+              <tr><td>data</td><td>object</td><td>必须</td><td>—</td><td>令牌信息</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> access_token</td><td>string</td><td>必须</td><td>—</td><td>JWT，有效期 24 小时</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> token_type</td><td>string</td><td>必须</td><td>bearer</td><td>令牌类型</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer"
+  }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>401</td><td>用户名或密码错误</td><td>用户不存在或密码不正确</td></tr>
+              <tr><td>422</td><td>参数错误：…</td><td>请求体字段缺失或类型错误</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="me" class="endpoint">
+          <h2><span class="method get">GET</span> 获取当前用户 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/auth/me</code></p>
+          <p><strong>Method：</strong> GET</p>
+          <p><strong>接口描述：</strong>根据 Bearer Token 返回当前登录用户。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>Bearer eyJhbGci...</td><td>登录接口返回的令牌</td></tr></tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>结果说明</td></tr>
+              <tr><td>data</td><td>object</td><td>必须</td><td>当前用户</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> id</td><td>integer</td><td>必须</td><td>用户 ID</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> username</td><td>string</td><td>必须</td><td>用户名</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": { "id": 1, "username": "reed" }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody><tr><td>401</td><td>未登录或登录已失效</td><td>Token 缺失、无效、过期或用户已不存在</td></tr></tbody>
+          </table></div>
+        </article>
+      </section>
+
+      <section id="category-apis">
+        <h1>分类相关接口</h1>
+
+        <article id="category-list" class="endpoint">
+          <h2><span class="method get">GET</span> 查询分类列表</h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/categories</code></p>
+          <p><strong>Method：</strong> GET</p>
+          <p><strong>接口描述：</strong>查询收入、支出分类；可按账单类型筛选。接口无需登录。</p>
+          <h3>请求参数</h3>
+          <p><strong>Query</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>type</td><td>string</td><td class="optional">否</td><td>null</td><td>expense</td><td><code>income</code> 收入；<code>expense</code> 支出</td></tr></tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>结果说明</td></tr>
+              <tr><td>data</td><td>object[]</td><td>必须</td><td>分类数组</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> id</td><td>integer</td><td>必须</td><td>分类 ID</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> name</td><td>string</td><td>必须</td><td>分类名称</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> type</td><td>string</td><td>必须</td><td><code>income</code> 或 <code>expense</code></td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> icon</td><td>string | null</td><td>必须</td><td>分类图标标识</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> sort</td><td>integer</td><td>必须</td><td>排序值</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    { "id": 6, "name": "餐饮", "type": "expense", "icon": "food", "sort": 1 }
+  ]
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody><tr><td>422</td><td>参数错误：type …</td><td><code>type</code> 不是 income 或 expense</td></tr></tbody>
+          </table></div>
+        </article>
+      </section>
+
+      <section id="bill-apis">
+        <h1>账单相关接口</h1>
+        <p class="note"><strong>原数据库基准：</strong>沿用已初始化的 <a href="bill-crud-reference/sql/pocket_ledger_init.sql">pocket_ledger_init.sql</a> 四张表及字典，工资 ID=1、餐饮 ID=6；分类 ID 通过 <code>GET /categories</code> 获取，上方分类响应仅展示一项。无需新建业务库或改表，也不要重跑含 DROP TABLE 的初始化脚本。细分的 user_id 由服务端写入；删除账单、注销用户由应用事务显式清理关联数据，数据库没有外键级联。</p>
+        <p class="note"><strong>账单参考实现补充约束：</strong>ID 必须为正整数，JSON 浮点 ID、额外请求体字段返回422。金额对应 DECIMAL(12,2)，整数最多10位、小数最多2位，输出为两位小数字符串。账单日期范围为1000-01-01至Asia/Taipei当天。描述与细分名称先trim，再按Java UTF-16长度校验；PUT中description缺失/null均清空。相同日期再按id同方向排序。数据库死锁或锁争用返回HTTP/code 409“数据正在被修改，请稍后重试”。这些规则与开发书中的参考代码配套，实施后需一同验收。</p>
+        <p class="note"><strong>认证：</strong>本组全部接口都需要 <code>Authorization: Bearer &lt;JWT&gt;</code>。服务端只操作当前用户的数据，请求体不接受 <code>user_id</code>。</p>
+
+        <article id="bill-add" class="endpoint">
+          <h2><span class="method post">POST</span> 新增账单 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/bills/add</code></p>
+          <p><strong>Method：</strong> POST</p>
+          <p><strong>接口描述：</strong>新增一笔收入或支出账单，可同时提交最多 20 个显式细分项。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>登录令牌</td></tr>
+              <tr><td>Content-Type</td><td>application/json</td><td>是</td><td>请求体格式</td></tr>
+            </tbody>
+          </table></div>
+          <p><strong>Body</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>备注</th><th>其他信息</th></tr></thead>
+            <tbody>
+              <tr><td>category_id</td><td>integer</td><td class="required">必须</td><td>—</td><td>分类 ID</td><td>分类必须存在</td></tr>
+              <tr><td>amount</td><td>decimal</td><td class="required">必须</td><td>—</td><td>账单总金额</td><td>&gt; 0；最多 12 位、2 位小数</td></tr>
+              <tr><td>description</td><td>string | null</td><td class="optional">否</td><td>null</td><td>账单说明</td><td>去除首尾空白；最长 200 字符</td></tr>
+              <tr><td>bill_date</td><td>date</td><td class="required">必须</td><td>—</td><td>账单日期</td><td><code>YYYY-MM-DD</code>；不得晚于今天</td></tr>
+              <tr><td>breakdowns</td><td>object[] | null</td><td class="optional">否</td><td>null</td><td>显式细分项</td><td>最多 20 项；null / [] 表示不启用细分</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> item_name</td><td>string</td><td class="required">必须</td><td>—</td><td>细分名称</td><td>1–50 字符；不可使用保留名“其他”</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> amount</td><td>decimal</td><td class="required">必须</td><td>—</td><td>细分金额</td><td>&gt; 0；最多 12 位、2 位小数</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "category_id": 6,
+  "amount": "68.50",
+  "description": "晚餐",
+  "bill_date": "2026-09-04",
+  "breakdowns": [
+    { "item_name": "主餐", "amount": "50.00" },
+    { "item_name": "饮料", "amount": "12.00" }
+  ]
+}</code></pre>
+          <h3>返回数据</h3>
+          <p>返回 <a href="#bill-response">BillResponse 账单对象</a>；新增响应会加载细分项。</p>
+          <pre><code>{
+  "code": 200,
+  "message": "添加成功",
+  "data": {
+    "id": 101,
+    "category_id": 6,
+    "category_name": "餐饮",
+    "type": "expense",
+    "amount": "68.50",
+    "description": "晚餐",
+    "bill_date": "2026-09-04",
+    "breakdowns": [
+      { "id": 201, "item_name": "主餐", "amount": "50.00", "sort_order": 0, "source": "user" },
+      { "id": 202, "item_name": "饮料", "amount": "12.00", "sort_order": 1, "source": "user" },
+      { "id": null, "item_name": "其他", "amount": "6.50", "sort_order": 2, "source": "system" }
+    ]
+  }
+}</code></pre>
+          <p class="note">显式细分合计小于账单总额时，服务端会在响应中追加不入库的“其他”余项：<code>id=null</code>、<code>source=system</code>。</p>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>400</td><td>分类不存在</td><td><code>category_id</code> 无对应分类</td></tr>
+              <tr><td>400</td><td>细分金额不能超过账单总额</td><td>细分金额合计大于 <code>amount</code></td></tr>
+              <tr><td>401</td><td>未登录或登录已失效</td><td>认证失败</td></tr>
+              <tr><td>422</td><td>参数错误：…</td><td>日期、金额、字段或细分项不符合约束</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="bill-list" class="endpoint">
+          <h2><span class="method get">GET</span> 账单分页查询 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/bills/list</code></p>
+          <p><strong>Method：</strong> GET</p>
+          <p><strong>接口描述：</strong>按日期、分类、收支类型筛选当前用户的账单，并返回分页数据与筛选范围内的收支合计。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody><tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>登录令牌</td></tr></tbody>
+          </table></div>
+          <p><strong>Query</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>类型</th><th>是否必须</th><th>默认值</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>startDate</td><td>date</td><td class="optional">否</td><td>null</td><td>2026-09-01</td><td>起始日期（含）</td></tr>
+              <tr><td>endDate</td><td>date</td><td class="optional">否</td><td>null</td><td>2026-09-30</td><td>结束日期（含），不得早于 startDate</td></tr>
+              <tr><td>categoryId</td><td>integer</td><td class="optional">否</td><td>null</td><td>6</td><td>分类 ID，最小为 1；餐饮为 6</td></tr>
+              <tr><td>billType</td><td>string</td><td class="optional">否</td><td>null</td><td>expense</td><td><code>income</code> 或 <code>expense</code></td></tr>
+              <tr><td>order</td><td>string</td><td class="optional">否</td><td>desc</td><td>desc</td><td>按账单日期 <code>asc</code> / <code>desc</code> 排序</td></tr>
+              <tr><td>page</td><td>integer</td><td class="optional">否</td><td>1</td><td>1</td><td>页码，最小为 1</td></tr>
+              <tr><td>pageSize</td><td>integer</td><td class="optional">否</td><td>10</td><td>20</td><td>每页数量，范围 1–100</td></tr>
+              <tr><td>includeBreakdowns</td><td>boolean</td><td class="optional">否</td><td>false</td><td>true</td><td>是否加载细分；false 时每项 breakdowns 为 null</td></tr>
+            </tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>结果说明</td></tr>
+              <tr><td>data</td><td>object</td><td>必须</td><td>分页结果</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> total</td><td>integer</td><td>必须</td><td>符合筛选条件的总记录数</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> page</td><td>integer</td><td>必须</td><td>当前页码</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> page_size</td><td>integer</td><td>必须</td><td>每页数量</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> income_total</td><td>decimal</td><td>必须</td><td>筛选范围内收入合计</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> expense_total</td><td>decimal</td><td>必须</td><td>筛选范围内支出合计</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> list</td><td>object[]</td><td>必须</td><td><a href="#bill-response">BillResponse</a> 数组</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 1,
+    "page": 1,
+    "page_size": 10,
+    "income_total": "0.00",
+    "expense_total": "68.50",
+    "list": [
+      {
+        "id": 101,
+        "category_id": 6,
+        "category_name": "餐饮",
+        "type": "expense",
+        "amount": "68.50",
+        "description": "晚餐",
+        "bill_date": "2026-09-04",
+        "breakdowns": null
+      }
+    ]
+  }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>401</td><td>未登录或登录已失效</td><td>认证失败</td></tr>
+              <tr><td>422</td><td>startDate 不能晚于 endDate</td><td>日期范围逆序</td></tr>
+              <tr><td>422</td><td>参数错误：…</td><td>枚举、页码、页大小或参数类型错误</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="bill-detail" class="endpoint">
+          <h2><span class="method get">GET</span> 查询账单详情 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/bills/{bill_id}</code></p>
+          <p><strong>Method：</strong> GET</p>
+          <p><strong>接口描述：</strong>查询当前用户的一笔账单；详情响应始终加载完整细分。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody><tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>登录令牌</td></tr></tbody>
+          </table></div>
+          <p><strong>路径参数</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>类型</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>bill_id</td><td>integer</td><td>101</td><td>账单 ID</td></tr></tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <p>返回 <a href="#bill-response">BillResponse 账单对象</a>，<code>breakdowns</code> 为数组。</p>
+          <pre><code>{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "id": 101,
+    "category_id": 6,
+    "category_name": "餐饮",
+    "type": "expense",
+    "amount": "68.50",
+    "description": "晚餐",
+    "bill_date": "2026-09-04",
+    "breakdowns": []
+  }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>401</td><td>未登录或登录已失效</td><td>认证失败</td></tr>
+              <tr><td>404</td><td>账单不存在</td><td>账单不存在或不属于当前用户</td></tr>
+              <tr><td>422</td><td>参数错误：bill_id …</td><td>路径参数不是整数</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="bill-update" class="endpoint">
+          <h2><span class="method put">PUT</span> 更新账单 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/bills/{bill_id}</code></p>
+          <p><strong>Method：</strong> PUT</p>
+          <p><strong>接口描述：</strong>更新当前用户的一笔账单；除路径参数外，请求字段与新增账单相同。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>登录令牌</td></tr>
+              <tr><td>Content-Type</td><td>application/json</td><td>是</td><td>请求体格式</td></tr>
+            </tbody>
+          </table></div>
+          <p><strong>路径参数</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>类型</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>bill_id</td><td>integer</td><td>101</td><td>要更新的账单 ID</td></tr></tbody>
+          </table></div>
+          <p><strong>Body</strong></p>
+          <p>字段定义同<a href="#bill-add">新增账单</a>。更新时 <code>breakdowns</code> 有以下语义：</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>breakdowns 值</th><th>行为</th></tr></thead>
+            <tbody>
+              <tr><td>字段缺失或 null</td><td>保留已有细分；若新总额小于已有细分合计则返回 400</td></tr>
+              <tr><td>[]</td><td>清空所有已有显式细分</td></tr>
+              <tr><td>非空数组</td><td>用新数组整体替换已有显式细分</td></tr>
+            </tbody>
+          </table></div>
+          <h3>返回数据</h3>
+          <p>返回 <a href="#bill-response">BillResponse 账单对象</a>；更新响应会加载细分项。</p>
+          <pre><code>{
+  "code": 200,
+  "message": "更新成功",
+  "data": {
+    "id": 101,
+    "category_id": 6,
+    "category_name": "餐饮",
+    "type": "expense",
+    "amount": "70.00",
+    "description": "晚餐（已更新）",
+    "bill_date": "2026-09-04",
+    "breakdowns": []
+  }
+}</code></pre>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>400</td><td>分类不存在</td><td><code>category_id</code> 无对应分类</td></tr>
+              <tr><td>400</td><td>细分金额不能超过账单总额</td><td>保留或替换后的细分合计超过新总额</td></tr>
+              <tr><td>401</td><td>未登录或登录已失效</td><td>认证失败</td></tr>
+              <tr><td>404</td><td>账单不存在</td><td>账单不存在或不属于当前用户</td></tr>
+              <tr><td>422</td><td>参数错误：…</td><td>路径或请求体校验失败</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="bill-delete" class="endpoint">
+          <h2><span class="method delete">DELETE</span> 批量删除账单 <span class="auth-badge">需要认证</span></h2>
+          <h3>基本信息</h3>
+          <p><strong>Path：</strong> <code>/bills</code></p>
+          <p><strong>Method：</strong> DELETE</p>
+          <p><strong>接口描述：</strong>按 ID 批量删除当前用户的账单及其细分，返回实际删除数量。</p>
+          <h3>请求参数</h3>
+          <p><strong>Headers</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>参数名称</th><th>参数值</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>Authorization</td><td>Bearer &lt;JWT&gt;</td><td>是</td><td>登录令牌</td></tr>
+              <tr><td>Content-Type</td><td>application/json</td><td>是</td><td>请求体格式</td></tr>
+            </tbody>
+          </table></div>
+          <p><strong>Body</strong></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>示例</th><th>备注</th></tr></thead>
+            <tbody><tr><td>ids</td><td>integer[]</td><td class="required">必须</td><td>[101, 102]</td><td>至少包含 1 个账单 ID</td></tr></tbody>
+          </table></div>
+          <pre><code>{ "ids": [101, 102] }</code></pre>
+          <h3>返回数据</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th></tr></thead>
+            <tbody>
+              <tr><td>code</td><td>integer</td><td>必须</td><td>200</td></tr>
+              <tr><td>message</td><td>string</td><td>必须</td><td>包含实际删除数量</td></tr>
+              <tr><td>data</td><td>integer</td><td>必须</td><td>实际删除的账单数量</td></tr>
+            </tbody>
+          </table></div>
+          <pre><code>{
+  "code": 200,
+  "message": "成功删除 2 条",
+  "data": 2
+}</code></pre>
+          <p class="note">不存在或属于其他用户的 ID 会被静默跳过，因此实际删除数量可能小于 <code>ids</code> 的长度。</p>
+          <h3>错误响应</h3>
+          <div class="table-wrap"><table class="error-table">
+            <thead><tr><th>HTTP / code</th><th>message</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>401</td><td>未登录或登录已失效</td><td>认证失败</td></tr>
+              <tr><td>422</td><td>参数错误：ids …</td><td><code>ids</code> 缺失、为空或元素类型错误</td></tr>
+            </tbody>
+          </table></div>
+        </article>
+
+        <article id="bill-response" class="endpoint">
+          <h2>BillResponse 账单响应结构</h2>
+          <p>新增、详情、更新接口的 <code>data</code>，以及分页接口 <code>data.list[]</code> 的公共结构。</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>名称</th><th>类型</th><th>是否必须</th><th>备注</th><th>其他信息</th></tr></thead>
+            <tbody>
+              <tr><td>id</td><td>integer</td><td>必须</td><td>账单 ID</td><td>—</td></tr>
+              <tr><td>category_id</td><td>integer</td><td>必须</td><td>分类 ID</td><td>—</td></tr>
+              <tr><td>category_name</td><td>string</td><td>必须</td><td>分类名称</td><td>—</td></tr>
+              <tr><td>type</td><td>string</td><td>必须</td><td>账单类型</td><td><code>income</code> / <code>expense</code></td></tr>
+              <tr><td>amount</td><td>decimal</td><td>必须</td><td>账单总金额</td><td>2 位小数</td></tr>
+              <tr><td>description</td><td>string | null</td><td>必须</td><td>账单说明</td><td>—</td></tr>
+              <tr><td>bill_date</td><td>date</td><td>必须</td><td>账单日期</td><td><code>YYYY-MM-DD</code></td></tr>
+              <tr><td>breakdowns</td><td>object[] | null</td><td>必须</td><td>账单细分</td><td>null 表示未加载；[] 表示已加载但没有显式细分</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> id</td><td>integer | null</td><td>必须</td><td>细分 ID</td><td>系统“其他”项为 null</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> item_name</td><td>string</td><td>必须</td><td>细分名称</td><td>—</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> amount</td><td>decimal</td><td>必须</td><td>细分金额</td><td>2 位小数</td></tr>
+              <tr><td class="nested-1"><span class="tree">├─</span> sort_order</td><td>integer</td><td>必须</td><td>显示顺序</td><td>从 0 开始</td></tr>
+              <tr><td class="nested-1"><span class="tree">└─</span> source</td><td>string</td><td>必须</td><td>细分来源</td><td><code>user</code> / <code>system</code></td></tr>
+            </tbody>
+          </table></div>
+        </article>
+      </section>
+
+      <section id="common-errors">
+        <h1>通用错误</h1>
+        <p>除根路径健康检查外，框架错误与业务错误也使用统一 <code>Result</code> 结构，且 HTTP 状态码与响应中的 <code>code</code> 相同。</p>
+        <div class="table-wrap"><table class="error-table">
+          <thead><tr><th>HTTP / code</th><th>含义</th><th>典型 message</th></tr></thead>
+          <tbody>
+            <tr><td>400</td><td>业务参数不合法</td><td>分类不存在；细分金额不能超过账单总额</td></tr>
+            <tr><td>401</td><td>认证失败</td><td>未登录或登录已失效；用户名或密码错误</td></tr>
+            <tr><td>404</td><td>资源或路径不存在</td><td>账单不存在；Not Found</td></tr>
+            <tr><td>405</td><td>请求方法不允许</td><td>Method Not Allowed</td></tr>
+            <tr><td>409</td><td>资源冲突</td><td>用户名已被占用</td></tr>
+            <tr><td>422</td><td>请求参数校验失败</td><td>参数错误：字段名 校验原因</td></tr>
+            <tr><td>500</td><td>未处理的服务端异常</td><td>服务器内部错误</td></tr>
+          </tbody>
+        </table></div>
+        <pre><code>{
+  "code": 401,
+  "message": "未登录或登录已失效",
+  "data": null
+}</code></pre>
+      </section>
+
+      <footer class="m-footer">
+        <p>依据 Pocket Ledger 当前源码整理 · 文档日期：2026-09-04</p>
+      </footer>
+    </main>
+  </div>
+
+  <a class="back-top" href="#top" aria-label="返回顶部">↑ 顶部</a>
+</body>
+</html>

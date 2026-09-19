@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>口袋账本 · PocketLedger</title>
+  <meta name="description" content="口袋账本 —— 优雅的个人记账应用">
+  <script>document.documentElement.dataset.theme = localStorage.getItem("pl_theme") || "dark";</script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366F1'/%3E%3Cstop offset='1' stop-color='%238B5CF6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Ctext x='32' y='43' font-size='32' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3E%C2%A5%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ============ 极光背景 ============ -->
+  <div class="aurora" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+    <span class="blob blob-4"></span>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <!-- ============ 顶部导航 ============ -->
+  <header class="navbar">
+    <div class="container navbar-inner">
+      <div class="brand">
+        <span class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+        </span>
+        <div class="brand-text">
+          <strong>口袋账本</strong>
+          <small>PocketLedger</small>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <span class="api-status" id="apiStatus" title="后端服务连接状态">
+          <i class="dot"></i><span id="apiStatusText">检测中…</span>
+        </span>
+        <span id="userName" hidden></span>
+        <button class="icon-btn" id="logoutBtn" title="退出登录" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+        <button class="icon-btn" id="themeToggle" title="切换浅色 / 深色">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+        <div class="settings-wrap">
+          <button class="icon-btn" id="settingsBtn" title="API 设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <div class="popover glass" id="settingsPopover" hidden>
+            <label class="popover-label" for="apiBaseInput">后端服务地址</label>
+            <input class="input" id="apiBaseInput" placeholder="http://localhost:8080" spellcheck="false">
+            <button class="btn btn-primary btn-sm btn-block" id="apiSaveBtn">保存并重连</button>
+            <p class="popover-hint">对应 Java 后端（pocket_ledger_java，默认端口 8080）。注意浏览器会优先使用本地保存的地址</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container page">
+
+    <!-- ============ 统计卡片 ============ -->
+    <section class="stats-grid">
+      <div class="stat-card glass stat-expense">
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">总支出</span>
+          <span class="stat-value num" id="statExpense" data-value="0">¥0.00</span>
+        </div>
+        <span class="stat-glow"></span>
+      </div>
+
+      <div class="stat-card glass stat-income">
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7 7 17"/><path d="M17 17H7V7"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">总收入</span>
+          <span class="stat-value num" id="statIncome" data-value="0">¥0.00</span>
+        </div>
+        <span class="stat-glow"></span>
+      </div>
+
+      <div class="stat-card glass stat-balance">
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+        </div>
+        <div class="stat-body">
+          <span class="stat-label">结余</span>
+          <span class="stat-value num gradient-text" id="statBalance" data-value="0">¥0.00</span>
+        </div>
+        <span class="stat-count" id="statCount">共 0 笔</span>
+        <span class="stat-glow"></span>
+      </div>
+    </section>
+
+    <!-- ============ 图表区 ============ -->
+    <section class="charts-grid">
+      <div class="card glass">
+        <div class="card-head">
+          <div>
+            <h2>收支趋势</h2>
+            <p class="card-sub" id="trendSub">按天统计</p>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item income"><i></i>收入</span>
+            <span class="legend-item expense"><i></i>支出</span>
+          </div>
+        </div>
+        <div class="chart-body" id="trendChart"></div>
+      </div>
+
+      <div class="card glass">
+        <div class="card-head">
+          <div>
+            <h2>分类构成</h2>
+            <p class="card-sub" id="donutSub">按分类统计占比</p>
+          </div>
+          <div class="segmented segmented-sm" id="donutTypeSeg">
+            <button type="button" data-type="expense" class="active">支出</button>
+            <button type="button" data-type="income">收入</button>
+          </div>
+        </div>
+        <div class="donut-flex">
+          <div class="donut-body" id="donutChart"></div>
+          <ul class="donut-legend" id="donutLegend"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 账单列表 ============ -->
+    <section class="card glass list-card">
+      <div class="card-head list-head">
+        <div class="list-title">
+          <h2>账单明细</h2>
+          <span class="count-badge" id="totalBadge">0 笔</span>
+        </div>
+        <div class="toolbar">
+          <div class="segmented" id="typeSeg">
+            <button type="button" data-type="" class="active">全部</button>
+            <button type="button" data-type="expense">支出</button>
+            <button type="button" data-type="income">收入</button>
+          </div>
+          <select class="input filter-select" id="categoryFilter" aria-label="按分类筛选">
+            <option value="">全部分类</option>
+          </select>
+          <div class="segmented segmented-sm" id="dateModeSeg" title="切换查询方式">
+            <button type="button" data-mode="single" class="active">单日</button>
+            <button type="button" data-mode="range">范围</button>
+          </div>
+          <div class="date-range" id="singleDateWrap">
+            <input class="input" type="date" id="singleDate" aria-label="单日日期">
+          </div>
+          <div class="date-range" id="rangeDateWrap" hidden>
+            <input class="input" type="date" id="startDate" aria-label="开始日期">
+            <span class="date-sep">→</span>
+            <input class="input" type="date" id="endDate" aria-label="结束日期">
+          </div>
+          <button class="btn btn-ghost btn-sm" id="orderBtn" title="切换排序">
+            <span id="orderLabel">日期</span>
+            <svg id="orderIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="btn btn-ghost btn-sm" id="resetBtn">重置</button>
+          <label class="select-all" title="全选本页">
+            <input type="checkbox" id="selectAll"><span>全选</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="bill-list" id="billList"></div>
+
+      <div class="list-footer">
+        <span class="page-info" id="pageInfo">—</span>
+        <div class="pagination" id="pagination"></div>
+        <select class="input page-size" id="pageSize" aria-label="每页条数">
+          <option value="10">10 条 / 页</option>
+          <option value="20">20 条 / 页</option>
+          <option value="50">50 条 / 页</option>
+        </select>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ 记一笔 FAB ============ -->
+  <button class="fab" id="addBtn" title="记一笔（快捷键 N）">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    <span class="fab-ring"></span>
+  </button>
+
+  <!-- ============ 批量操作栏 ============ -->
+  <div class="batch-bar glass" id="batchBar" hidden>
+    <span class="batch-info">已选 <b id="batchCount">0</b> 条</span>
+    <span class="batch-sum num" id="batchSum"></span>
+    <button class="btn btn-danger btn-sm" id="batchDeleteBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      删除
+    </button>
+    <button class="btn btn-ghost btn-sm" id="batchCancelBtn">取消</button>
+  </div>
+
+  <!-- ============ 新增 / 编辑账单弹窗 ============ -->
+  <div class="modal-overlay" id="billModal" hidden>
+    <div class="modal glass" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h3 id="modalTitle">记一笔</h3>
+        <button class="icon-btn" id="modalClose" title="关闭（Esc）">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <form id="billForm" novalidate>
+        <!-- 类型切换 -->
+        <div class="type-toggle" id="typeToggle">
+          <button type="button" data-type="expense" class="active">
+            <span class="type-sign">−</span> 支出
+          </button>
+          <button type="button" data-type="income">
+            <span class="type-sign">+</span> 收入
+          </button>
+        </div>
+
+        <!-- 金额 -->
+        <div class="amount-field" id="amountField">
+          <span class="currency">¥</span>
+          <input class="num" id="amountInput" inputmode="decimal" placeholder="0.00" autocomplete="off" maxlength="13">
+        </div>
+        <p class="field-error" id="amountError" hidden></p>
+
+        <!-- 细分明细（可选）：显式行 + 系统自动补足的“其他”，随金额实时计算 -->
+        <div class="field-label breakdown-label">
+          细分明细 <small class="desc-counter" id="breakdownCounter">可选 · 最多 20 项</small>
+        </div>
+        <div class="breakdown-editor" id="breakdownEditor">
+          <div class="breakdown-rows" id="breakdownRows"></div>
+
+          <div class="breakdown-summary" id="breakdownSummary" hidden>
+            <div class="bd-row bd-system-row" id="bdSystemRow" hidden>
+              <span class="bd-name">其他<em class="bd-tag">自动补足</em></span>
+              <span class="bd-amount num" id="bdSystemAmount">¥0.00</span>
+            </div>
+            <div class="bd-total">
+              <span>已细分 <b class="num" id="bdAllocated">¥0.00</b></span>
+              <span id="bdRemainWrap">剩余 <b class="num" id="bdRemain">¥0.00</b></span>
+              <span class="bd-full-tag" id="bdFullTag" hidden>✓ 已全部细分</span>
+              <span class="bd-over-tag" id="bdOverTag" hidden>超出 <b class="num" id="bdOver">¥0.00</b></span>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-ghost btn-sm btn-block" id="addBreakdownBtn">＋ 添加细分</button>
+          <p class="field-error" id="breakdownError" hidden></p>
+        </div>
+
+        <!-- 分类（选项来自 GET /categories，写死字典，无自定义） -->
+        <div class="field-label">分类</div>
+        <div class="category-grid" id="categoryGrid"></div>
+        <p class="field-error" id="categoryError" hidden></p>
+
+        <!-- 日期 + 备注 -->
+        <div class="form-row">
+          <div class="form-col">
+            <div class="field-label">日期</div>
+            <input class="input" type="date" id="billDate">
+          </div>
+          <div class="form-col">
+            <div class="field-label">备注 <small class="desc-counter" id="descCounter">0 / 200</small></div>
+            <input class="input" id="descInput" maxlength="200" placeholder="写点什么…（可选）" autocomplete="off">
+          </div>
+        </div>
+        <p class="field-error" id="dateError" hidden></p>
+
+        <div class="modal-foot">
+          <button type="button" class="btn btn-ghost" id="modalCancel">取消</button>
+          <button type="submit" class="btn btn-primary" id="modalSubmit">
+            <span class="btn-spinner" hidden></span>
+            <span class="btn-text">保存</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ 确认删除弹窗 ============ -->
+  <div class="modal-overlay" id="confirmModal" hidden>
+    <div class="modal modal-sm glass" role="alertdialog" aria-modal="true">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>
+      </div>
+      <h3 id="confirmTitle">删除账单</h3>
+      <p class="confirm-text" id="confirmText">确定要删除这条账单吗？</p>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="confirmCancel">取消</button>
+        <button class="btn btn-danger" id="confirmOk">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 登录 / 注册（不可关闭，登录前唯一入口） ============ -->
+  <div class="modal-overlay" id="authOverlay" hidden>
+    <div class="modal modal-sm glass" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="modal-head">
+        <h3 id="authTitle">登录口袋账本</h3>
+      </div>
+      <form id="authForm" novalidate>
+        <div class="field-label">用户名</div>
+        <input class="input" id="authUsername" autocomplete="username" maxlength="50" spellcheck="false">
+        <div class="field-label" style="margin-top:12px">密码</div>
+        <input class="input" id="authPassword" type="password" maxlength="64" placeholder="8~64 位">
+        <p class="field-error" id="authError" hidden></p>
+        <details style="margin-top:12px">
+          <summary class="field-label" style="cursor:pointer;user-select:none">后端服务地址（连不上时在这里改）</summary>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input class="input" id="authApiBase" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn btn-ghost btn-sm" id="authApiSaveBtn" style="white-space:nowrap">保存并重连</button>
+          </div>
+          <p class="popover-hint" style="margin:6px 0 0">保存后立即重新检测连接，无需刷新页面</p>
+        </details>
+        <div class="modal-foot" style="margin-top:16px">
+          <button type="submit" class="btn btn-primary btn-block" id="authSubmit">
+            <span class="btn-spinner" hidden></span>
+            <span class="btn-text">登录</span>
+          </button>
+        </div>
+        <p class="popover-hint" style="text-align:center;margin:10px 0 0">
+          <button type="button" class="btn btn-ghost btn-sm" id="authToggleBtn">没有账号？注册一个</button>
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Toast 容器 ============ -->
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <script src="js/api.js?v=2"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/app.js?v=2"></script>
+</body>
+</html>

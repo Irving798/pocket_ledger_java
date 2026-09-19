@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: pocket_ledger_java
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:pocket_ledger_yihai}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Taipei&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: PocketLedgerHikariPool
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout: 30000
+      validation-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-secret-key-change-me-before-production}
+  expire-minutes: 1440
+
+auth:
+  # /error 放行，保留容器错误状态码语义。
+  ignore-urls: /auth/register,/auth/login,/categories,/,/error

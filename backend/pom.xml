@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.3.0.RELEASE</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.fly</groupId>
+    <artifactId>pocket_ledger_java</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>pocket_ledger_java</name>
+    <description>pocket_ledger_java</description>
+
+    <properties>
+        <!-- 统一构建基线：JDK 8，源码级别与目标字节码均为 Java 8。 -->
+        <java.version>1.8</java.version>
+        <!-- 显式锁定编译插件，避免只依赖父 POM 的隐式版本。 -->
+        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- MyBatis-Plus：公司为 MSF 封装版，底层同源；本地取 Boot 2.3 时代的稳定版 -->
+        <mybatis-plus.version>3.4.3.4</mybatis-plus.version>
+        <!-- MySQL 驱动（注意老坐标 mysql:mysql-connector-java，不是 Boot 3 时代的 com.mysql:mysql-connector-j） -->
+        <mysql-connector.version>8.0.20</mysql-connector.version>
+        <!-- JWT（0.11.5 确定兼容 Java 8；API 与网上旧教程常见的 0.9.x 不同） -->
+        <jjwt.version>0.11.5</jjwt.version>
+        <!-- 固定使用兼容 JDK 8 的 Lombok 版本。 -->
+        <lombok.version>1.18.30</lombok.version>
+    </properties>
+
+    <dependencies>
+        <!-- Web 能力：内嵌 Tomcat 9 + Spring MVC 5.2，有了它才能写 HTTP 接口 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Java Bean Validation：Boot 2.3 起 web starter 不再自带，必须显式引入（javax.validation 命名空间） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Lombok：Java 8 时代企业项目标配，替代手写 getter/setter -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ==================== 数据层 ==================== -->
+
+        <!-- MyBatis-Plus（公司内用 MSF 封装的 MyBatis-Plus，底层同源；本地用官方 starter 对齐能力） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!-- MySQL JDBC 驱动 8.0.20 -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql-connector.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ==================== 认证相关（学习用途；公司内统一由 saas-starter-uaa 提供） ==================== -->
+
+        <!-- 只引入 Spring Security 的加密模块，用 BCrypt 做密码哈希；不启用 Security 过滤器链 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
+        <!-- JWT 生成与解析（jjwt 三件套：api 编译期 / impl 与 jackson 运行期） -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- 测试：Boot 2.3 的 starter-test 自带 JUnit 5 + Mockito + AssertJ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- 编译器版本与 source/target 显式声明，IDE 与 Maven 均以 Java 8 为准。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

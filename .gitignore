@@ -1,0 +1,40 @@
+# Retained locally; outside the maintained project scope
+/frontend_vue/
+
+# IDE and local agent configuration
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.claude/
+.codex/
+
+# Build output, dependencies, and test reports
+target/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.class
+*.log
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini

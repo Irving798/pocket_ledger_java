@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.fly.pocket_ledger_java.mapper.BillMapper">
+    <!-- 账单列表与详情共用的基础列，返回分类名称和收支类型。 -->
+    <sql id="columns">
+        b.id, b.category_id, c.name AS category_name, c.type,
+        b.amount, b.description, b.bill_date
+    </sql>
+
+    <!-- 汇总与分页查询共用的用户隔离及动态筛选条件。 -->
+    <sql id="filteredFrom">
+        FROM fly_bill b JOIN fly_category c ON c.id = b.category_id
+        WHERE b.user_id = #{userId}
+        <if test="q.start_date != null">AND b.bill_date >= #{q.start_date}</if>
+        <if test="q.end_date != null">AND b.bill_date &lt;= #{q.end_date}</if>
+        <if test="q.category_id != null">AND b.category_id = #{q.category_id}</if>
+        <if test="q.bill_type != null">AND c.type = #{q.bill_type}</if>
+    </sql>
+
+    <!-- 按用户归属锁定单笔账单，排他锁，供后续更新或删除流程使用。 -->
+    <select id="lockOwned" resultType="com.fly.pocket_ledger_java.entity.Bill">
+        SELECT id, user_id, category_id, amount, description, bill_date
+        FROM fly_bill WHERE user_id = #{userId} AND id = #{id} FOR UPDATE
+    </select>
+
+    <!-- 根据账单ID查询单条账单详情 -->
+    <select id="findOwned" resultType="com.fly.pocket_ledger_java.mapper.model.BillRow">
+        SELECT <include refid="columns"/>
+        FROM fly_bill b JOIN fly_category c ON c.id = b.category_id
+        WHERE b.user_id = #{userId} AND b.id = #{id}
+    </select>
+
+    <!-- 批量排他锁来锁定当前用户拥有的账单 -->
+    <select id="lockOwnedIds" resultType="java.lang.Long">
+        SELECT id FROM fly_bill WHERE user_id = #{userId}
+        <choose>
+            <when test="ids != null and ids.size() > 0">
+                AND id IN
+                <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <!-- 空 ID 集合时不锁定任何账单，防止范围扩大到该用户的全部数据。 -->
+            <otherwise>AND 1 = 0</otherwise>
+        </choose>
+        ORDER BY id ASC FOR UPDATE
+    </select>
+
+    <!-- 统计账单数量、收入、支出合计。 -->
+    <select id="summarize" resultType="com.fly.pocket_ledger_java.mapper.model.BillSummary">
+        SELECT COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN c.type = 'income' THEN b.amount ELSE 0 END), 0) AS income_total,
+        COALESCE(SUM(CASE WHEN c.type = 'expense' THEN b.amount ELSE 0 END), 0) AS expense_total
+        <include refid="filteredFrom"/>
+    </select>
+
+    <!-- 分页查询账单 -->
+    <select id="findPage" resultType="com.fly.pocket_ledger_java.mapper.model.BillRow">
+        SELECT <include refid="columns"/>
+        <include refid="filteredFrom"/>
+        <choose>
+            <when test='q.order == "asc"'>ORDER BY b.bill_date ASC, b.id ASC</when>
+            <otherwise>ORDER BY b.bill_date DESC, b.id DESC</otherwise>
+        </choose>
+        LIMIT #{q.page_size} OFFSET #{offset}
+    </select>
+
+    <!-- 账单更新修改操作 -->
+    <update id="updateOwned">
+        UPDATE fly_bill SET category_id = #{bill.categoryId}, amount = #{bill.amount},
+        description = #{bill.description,jdbcType=VARCHAR}, bill_date = #{bill.billDate}
+        WHERE user_id = #{userId} AND id = #{bill.id}
+    </update>
+
+    <!-- 批量删除账单操作 -->
+    <delete id="deleteOwned">
+        DELETE FROM fly_bill WHERE user_id = #{userId}
+        <choose>
+            <when test="ids != null and ids.size() > 0">
+                AND id IN
+                <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <!-- 空 ID 集合时不删除任何账单，防止误删该用户的全部数据。 -->
+            <otherwise>AND 1 = 0</otherwise>
+        </choose>
+    </delete>
+</mapper>
