@@ -104,6 +104,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- 头像仅保存原始字节，不添加图片解码、缩放或 EXIF 处理依赖。 -->
+        <dependency>
+            <groupId>com.aliyun.oss</groupId>
+            <artifactId>aliyun-sdk-oss</artifactId>
+            <version>3.18.4</version>
+        </dependency>
     </dependencies>
 
     <build>

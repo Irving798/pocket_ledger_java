@@ -16,6 +16,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+// 大小超限必须比普通 multipart 解析失败更具体，Spring 会选择最具体的处理器。
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * 全局接口异常处理器，将参数、业务、协议及未知异常转换为统一响应结构。
@@ -77,7 +81,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
     public ApiResponse<Void> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
         return ApiResponse.failure(ResultCode.PARAM_INVALID.getCode(),
-                "参数错误：Content-Type 不受支持，请使用 application/json");
+                "参数错误：Content-Type 不受支持，请按接口使用 JSON 或 multipart/form-data");
     }
 
     /**
@@ -88,6 +92,21 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException exception) {
         return ApiResponse.failure(ResultCode.METHOD_NOT_ALLOWED);
     }
+
+    /** 上传超过容器配置或文件大小限制时返回 413。 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ApiResponse<Void> handleUploadTooLarge(MaxUploadSizeExceededException exception) {
+        return ApiResponse.failure(ResultCode.AVATAR_TOO_LARGE);
+    }
+
+    /** multipart 缺失部分、边界错误等格式问题统一返回 422。 */
+    @ExceptionHandler({MultipartException.class, MissingServletRequestPartException.class})
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ApiResponse<Void> handleInvalidMultipart(Exception exception) {
+        return ApiResponse.failure(422, "参数错误：请使用合法的 multipart/form-data 上传头像");
+    }
+
 
     /**
      * 记录未被其他处理器覆盖的异常，并隐藏内部细节后返回 500。
