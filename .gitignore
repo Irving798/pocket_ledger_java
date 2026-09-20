@@ -25,6 +25,7 @@ test-results/
 .env.*
 !.env.example
 !.env.sample
+**/application.yml
 **/application-local.yml
 **/application-local.yaml
 **/application-local.properties
