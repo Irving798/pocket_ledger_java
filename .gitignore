@@ -39,3 +39,8 @@ test-results/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# 本地文档（AI 指南与 README，仅本地保留，不纳入版本管理）
+CLAUDE.md
+AGENTS.md
+**/README*.md
