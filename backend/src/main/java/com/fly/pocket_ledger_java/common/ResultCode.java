@@ -36,6 +36,13 @@ public enum ResultCode {
     BILL_NOT_FOUND(404, "账单不存在"),
     WRITE_CONFLICT(409, "数据正在被修改，请稍后重试"),
 
+    /** 文件格式、数量或内容不符合头像规则。 */
+    AVATAR_INVALID(422, "头像仅支持 JPG、PNG 格式"),
+    /** 最大 2 MiB，HTTP 状态与响应 code 一致。 */
+    AVATAR_TOO_LARGE(413, "头像不能超过 2 MB"),
+    /** 必须成功的 OSS 上传暂不可用；删除旧图失败不使用此响应。 */
+    AVATAR_STORAGE_UNAVAILABLE(503, "头像存储暂不可用，请稍后重试"),
+
     /** 未处理的服务端异常 */
     INTERNAL_ERROR(500, "服务器内部错误");
 

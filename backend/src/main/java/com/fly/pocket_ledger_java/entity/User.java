@@ -23,6 +23,15 @@ public class User {
     /** 密码哈希（bcrypt），绝不通过接口返回 */
     private String passwordHash;
 
+    /** 展示昵称；空值由前端回退为用户名。 */
+    private String nickname;
+
+    /** OSS 对象标识；不保存完整 URL，不接收客户端直接赋值。 */
+    private String avatarObjectKey;
+
+    /** 联系邮箱；只校验格式，允许重复。 */
+    private String email;
+
     /** 注册时间 */
     private LocalDateTime createdAt;
 

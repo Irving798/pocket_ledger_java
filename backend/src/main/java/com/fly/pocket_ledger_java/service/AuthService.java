@@ -4,6 +4,8 @@ import com.fly.pocket_ledger_java.dto.LoginDTO;
 import com.fly.pocket_ledger_java.dto.RegisterDTO;
 import com.fly.pocket_ledger_java.vo.TokenVO;
 import com.fly.pocket_ledger_java.vo.UserVO;
+import com.fly.pocket_ledger_java.dto.UserProfileUpdateDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 认证业务接口，定义注册、登录及当前用户查询。
@@ -32,4 +34,13 @@ public interface AuthService {
      * @return 当前用户的公开信息
      */
     UserVO getCurrentUser();
+
+    /** 只更新当前用户的昵称、邮箱，不改变头像。 */
+    UserVO updateCurrentUser(UserProfileUpdateDTO dto);
+
+    /** 上传新图、提交头像关联、尽力清理旧图。 */
+    void replaceAvatar(MultipartFile file);
+
+    /** 清空当前用户头像，重复调用仍成功。 */
+    void removeAvatar();
 }
