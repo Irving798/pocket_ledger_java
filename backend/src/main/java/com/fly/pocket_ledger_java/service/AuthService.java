@@ -38,9 +38,9 @@ public interface AuthService {
     /** 只更新当前用户的昵称、邮箱，不改变头像。 */
     UserVO updateCurrentUser(UserProfileUpdateDTO dto);
 
-    /** 上传新图、提交头像关联、尽力清理旧图。 */
+    /** 上传新图、提交头像关联、并清理旧图。 */
     void replaceAvatar(MultipartFile file);
 
-    /** 清空当前用户头像，重复调用仍成功。 */
+    /** 清空当前用户头像 */
     void removeAvatar();
 }
