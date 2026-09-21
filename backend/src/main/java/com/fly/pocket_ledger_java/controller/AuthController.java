@@ -58,27 +58,27 @@ public class AuthController {
     }
 
     /**
-     * 当前登录用户（需登录）：演示如何取用鉴权上下文
+     * 获取当前登录用户（需登录）
      */
     @GetMapping("/me")
     public ApiResponse<UserVO> me() {
         return ApiResponse.success(authService.getCurrentUser());
     }
 
-    /** 只接收昵称和邮箱，身份由认证拦截器提供。 */
+    /** 更新昵称和邮箱，身份由认证拦截器提供。 */
     @PutMapping("/me")
     public ApiResponse<UserVO> updateMe(@Valid @RequestBody UserProfileUpdateDTO dto) {
         return ApiResponse.success("资料更新成功", authService.updateCurrentUser(dto));
     }
 
-    /** 上传成功必须意味着对象上传和头像关联写入均已完成。 */
+    /** 上传更新用户信息的头像 */
     @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<UserVO> uploadAvatar(MultipartHttpServletRequest request) {
         MultipartFile file = requireSingleAvatar(request);
         authService.replaceAvatar(file);
         return ApiResponse.success("头像更新成功", authService.getCurrentUser());
     }
-
+    /** 删除用户信息的头像 */
     @DeleteMapping("/me/avatar")
     public ApiResponse<UserVO> removeAvatar() {
         // 先完成变更再读取；变更失败不得继续生成成功响应。

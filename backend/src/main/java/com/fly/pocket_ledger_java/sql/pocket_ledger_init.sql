@@ -20,8 +20,11 @@ CREATE TABLE `fly_user`
 (
     `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `username`      VARCHAR(50)      NOT NULL COMMENT '登录名，唯一',
-    `password_hash` VARCHAR(255)     NOT NULL COMMENT '密码哈希（bcrypt 输出 60 字符；255 预留算法迁移空间），绝不存明文',
-    `created_at`    DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（注册时间）',
+    `password_hash`     VARCHAR(255) NOT NULL COMMENT '密码哈希（bcrypt 输出 60 字符；255 预留算法迁移空间），绝不存明文',
+    `nickname`          VARCHAR(50)  NULL COMMENT '展示昵称；空值由前端回退为用户名',
+    `avatar_object_key` VARCHAR(255) NULL COMMENT 'OSS 头像对象键（avatars/ 前缀），不保存完整 URL',
+    `email`             VARCHAR(254) NULL COMMENT '联系邮箱；只校验格式，允许重复',
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间（注册时间）',
     `updated_at`    DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间（资料或密码的最后修改时间）',
 
     PRIMARY KEY (`id`),
