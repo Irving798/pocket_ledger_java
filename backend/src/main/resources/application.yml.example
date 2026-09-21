@@ -15,6 +15,11 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
 
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
@@ -29,3 +34,11 @@ jwt:
 auth:
   # /error 放行，保留容器错误状态码语义。
   ignore-urls: /auth/register,/auth/login,/categories,/,/error
+
+aliyun:
+  oss:
+    endpoint: ${OSS_ENDPOINT:https://oss-cn-hangzhou.aliyuncs.com}
+    region: ${OSS_REGION:cn-hangzhou}
+    bucket: ${OSS_BUCKET:your-bucket}
+    public-base-url: ${OSS_PUBLIC_BASE_URL:https://your-bucket.oss-cn-hangzhou.aliyuncs.com}
+    avatar-prefix: avatars/
