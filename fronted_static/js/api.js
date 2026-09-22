@@ -57,8 +57,9 @@ const API = (() => {
       if (!response.ok || !payload || payload.code !== 200) {
         const err = new Error((payload && payload.message) || ("请求失败（HTTP " + response.status + "）"));
         err.httpStatus = response.status;
-        // 5xx 或成功状态却无法解包时，写请求是否完成可能无法确认。
-        err.uncertain = response.status >= 500 || (response.ok && !payload);
+        // 收到响应却解不出 JSON（如网关错误页）时，写请求是否完成无法确认；
+        // 后端正常返回 JSON 错误体（含 5xx 业务错误）则为明确失败。
+        err.uncertain = !payload && (response.ok || response.status >= 500);
         if (response.status === 401 && !path.startsWith("/auth/login")) {
           if (getToken() === token && getBase() === base) {
             clearToken();

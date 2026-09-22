@@ -421,17 +421,19 @@
       if (!isCurrent()) return;
       let message = err.message;
       if (err.uncertain) {
+        // 进到此分支的都是无响应或解不出 JSON：带 HTTP 状态的把根因拼入提示，超时/断网用兜底描述。
+        const cause = err.httpStatus ? "：" + err.message : "";
         try {
           const actual = await API.me();
           if (!isCurrent()) return;
           if (actual.id !== userId) throw new Error("当前用户不一致");
           state.user = actual;
           renderIdentity();
-          message = "结果曾无法确认，已刷新当前已保存资料；请核对后决定是否再次提交。";
+          message = "结果曾无法确认" + cause + "；已刷新当前已保存资料，请核对后决定是否再次提交。";
         } catch (checkError) {
           if (generation !== profileState.sessionGeneration || checkError.stale) return;
           if (handleAuthError(checkError)) return;
-          message = "结果暂无法确认，查询当前资料也失败；请恢复连接后刷新页面，再打开资料核对。";
+          message = "结果暂无法确认" + cause + "；查询当前资料也失败，请恢复连接后刷新页面，再打开资料核对。";
         }
       }
       if (isCurrent()) showError(errorEl, message);
