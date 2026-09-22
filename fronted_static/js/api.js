@@ -206,7 +206,7 @@ const API = (() => {
     return request("/bills", { method: "DELETE", body: { ids } });
   }
 
-  /** 健康检查（后端根路径） */
+  /** 健康检查（后端根路径，同样走统一响应包装） */
   function health() {
     return request("/", { timeout: 4000 });
   }

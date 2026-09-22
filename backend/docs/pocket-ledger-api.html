@@ -326,12 +326,14 @@
           <h3>基本信息</h3>
           <p><strong>Path：</strong> <code>/</code></p>
           <p><strong>Method：</strong> GET</p>
-          <p><strong>接口描述：</strong>检查 API 服务是否可访问。此接口不使用统一响应包装。</p>
+          <p><strong>接口描述：</strong>检查 API 服务是否可访问。无需认证，返回统一 ApiResponse 包装。</p>
           <h3>请求参数</h3>
           <p>无。</p>
           <h3>返回数据</h3>
           <pre><code>{
-  "message": "Hello World"
+  "code": 200,
+  "message": "Hello World",
+  "data": null
 }</code></pre>
         </article>
       </section>
