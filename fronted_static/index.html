@@ -36,7 +36,14 @@
         <span class="api-status" id="apiStatus" title="后端服务连接状态">
           <i class="dot"></i><span id="apiStatusText">检测中…</span>
         </span>
+        <!-- 插在原 userName 前；背景由 CSS 提供固定默认头像。 -->
+        <span id="navAvatar" class="avatar avatar-small" hidden>
+          <img alt="当前头像" hidden>
+        </span>
         <span id="userName" hidden></span>
+        <!-- 插在原 userName 后、logoutBtn 前。 -->
+        <button type="button" class="btn btn-ghost btn-sm" id="profileBtn" hidden>个人资料</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="appLoadRetry" hidden>重新加载</button>
         <button class="icon-btn" id="logoutBtn" title="退出登录" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
@@ -283,6 +290,52 @@
     </div>
   </div>
 
+  <!-- ============ 个人资料弹窗 ============ -->
+  <!-- 独立资料弹窗：头像即时保存，文本资料按“保存资料”提交。 -->
+  <div class="modal-overlay" id="profileModal" hidden>
+    <div class="modal glass" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="modal-head">
+        <h3 id="profileTitle">个人资料</h3>
+        <button type="button" class="btn btn-ghost btn-sm" id="profileClose">关闭</button>
+      </div>
+      <div class="profile-fields">
+        <p>用户名：<strong id="profileUsername"></strong></p>
+        <p>当前头像</p>
+        <span class="avatar" id="profileAvatar"><img alt="当前已保存头像" hidden></span>
+        <input id="avatarFile" type="file" accept="image/jpeg,image/png" hidden>
+        <div class="profile-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="avatarChoose">选择图片</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="avatarRemove">恢复默认</button>
+        </div>
+        <div id="avatarPending" hidden>
+          <p>待上传预览（尚未保存）</p>
+          <img class="avatar-preview" id="avatarPreview" alt="待上传头像，居中裁切" hidden>
+          <div class="profile-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="avatarUpload">确认上传</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="avatarCancel">取消选择</button>
+          </div>
+        </div>
+        <p class="popover-hint">支持 JPG、PNG，最大 2 MB。原图上传；确认上传后立即生效，关闭弹窗不会撤销。</p>
+        <p class="field-error" id="avatarError" hidden></p>
+        <form id="profileForm" novalidate>
+          <label class="field-label" for="profileNickname">昵称（可选）</label>
+          <input class="input" type="text" id="profileNickname" maxlength="50">
+          <p class="popover-hint">未填写时显示用户名。</p>
+          <label class="field-label" for="profileEmail">联系邮箱（可选）</label>
+          <input class="input" type="email" id="profileEmail" maxlength="254">
+          <p class="popover-hint">仅作联系资料，不用于登录或密码找回。</p>
+          <p class="field-error" id="profileError" hidden></p>
+          <div class="modal-foot">
+            <button type="button" class="btn btn-ghost" id="profileCancel">关闭</button>
+            <button type="submit" class="btn btn-primary" id="profileSubmit">
+              <span class="btn-spinner" hidden></span><span class="btn-text">保存资料</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ 确认删除弹窗 ============ -->
   <div class="modal-overlay" id="confirmModal" hidden>
     <div class="modal modal-sm glass" role="alertdialog" aria-modal="true">
@@ -309,6 +362,33 @@
         <input class="input" id="authUsername" autocomplete="username" maxlength="50" spellcheck="false">
         <div class="field-label" style="margin-top:12px">密码</div>
         <input class="input" id="authPassword" type="password" maxlength="64" placeholder="8~64 位">
+        <!-- 只在注册模式显示；已有 authForm 的 novalidate 由 JS 主动校验。 -->
+        <div id="registerOptionalFields" class="profile-fields" hidden>
+          <label class="field-label" for="registerNickname">昵称（可选）</label>
+          <input class="input" id="registerNickname" type="text" maxlength="50">
+          <p class="popover-hint">未填写时显示用户名。</p>
+          <label class="field-label" for="registerEmail">联系邮箱（可选）</label>
+          <input class="input" id="registerEmail" type="email" maxlength="254">
+          <p class="popover-hint">仅作联系资料，不用于登录或密码找回。</p>
+          <input id="registerAvatarFile" type="file" accept="image/jpeg,image/png" hidden>
+          <div class="profile-actions">
+            <button class="btn btn-ghost btn-sm" type="button" id="registerAvatarChoose">选择头像（可选）</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="registerAvatarCancel" hidden>取消选择</button>
+          </div>
+          <img class="avatar-preview" id="registerAvatarPreview" alt="待提交的注册头像，居中裁切" hidden>
+          <p class="popover-hint">JPG、PNG，最大 2 MB；原图上传，预览按圆形居中裁切。</p>
+          <p class="field-error" id="registerAvatarError" hidden></p>
+        </div>
+        <!-- 账号已经创建后，后续操作只继续登录或上传，绝不重复注册。 -->
+        <div id="registerRecovery" class="profile-fields" hidden>
+          <p id="registerStatus" role="status"></p>
+          <span id="registerCurrentAvatar" class="avatar" hidden><img alt="服务器当前头像" hidden></span>
+          <div class="profile-actions">
+            <button class="btn btn-primary btn-sm" type="button" id="registerAvatarRetry">确认上传所选头像</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="registerAvatarSkip">暂时跳过</button>
+            <button class="btn btn-ghost btn-sm" type="button" id="registerAbandon">放弃续传并返回登录</button>
+          </div>
+        </div>
         <p class="field-error" id="authError" hidden></p>
         <details style="margin-top:12px">
           <summary class="field-label" style="cursor:pointer;user-select:none">后端服务地址（连不上时在这里改）</summary>
@@ -334,8 +414,8 @@
   <!-- ============ Toast 容器 ============ -->
   <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
-  <script src="js/api.js?v=2"></script>
+  <script src="js/api.js?v=3"></script>
   <script src="js/charts.js"></script>
-  <script src="js/app.js?v=2"></script>
+  <script src="js/app.js?v=3"></script>
 </body>
 </html>

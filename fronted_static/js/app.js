@@ -1,10 +1,14 @@
 /* ============================================================
-   口袋账本 —— 主逻辑（v4.1）
+   口袋账本 —— 主逻辑（v5.0）
    登录/注册 · 状态管理 · 列表渲染 · 筛选分页 · 弹窗表单 · 批量操作
    分类来源：GET /categories（后端只读字典，前端不再维护常量）
    账单字段：category_id / category_name / type（type 由分类决定）
    v4.1：账单细分编辑器（formBreakdowns 只存用户显式项，系统“其他”
          由总金额实时计算，不进数组、不参与提交）+ 列表细分展开展示
+   v5.0：用户资料弹窗（昵称/邮箱 PUT、头像上传/恢复默认，两处图片
+         共用选择-预览-上传能力）；注册分阶段提交（资料随注册写入、
+         头像登录后单独上传），失败恢复绝不重复建号；会话代次保护，
+         旧响应不覆盖新账号，写请求结果不确定时先核对再提示
    ============================================================ */
 
 (() => {
@@ -63,6 +67,16 @@
     donutType: "expense",
   };
 
+  // 两处图片各自保存 File 和预览地址，不能相互覆盖。
+  const profileState = {
+    pendingFile: null, previewUrl: null, selecting: false, selectionId: 0,
+    saving: false, uploading: false, removing: false, sessionGeneration: 0,
+  };
+  const registrationState = {
+    phase: "idle", pendingFile: null, previewUrl: null, selecting: false, selectionId: 0,
+    registeredUserId: null, registeredUsername: null, generation: 0,
+  };
+
   /* ==================== DOM 引用 ==================== */
 
   const $ = (id) => document.getElementById(id);
@@ -107,6 +121,14 @@
   const authError = $("authError"), authSubmit = $("authSubmit"), authToggleBtn = $("authToggleBtn");
   // 登录弹窗内的后端地址设置：连不上时不用进主界面也能改（顶栏齿轮会被登录遮罩挡住）
   const authApiBase = $("authApiBase"), authApiSaveBtn = $("authApiSaveBtn");
+  // 沿用现有 $，所有 ID 与资料 / 注册区块的 HTML 对应。
+  const navAvatar = $("navAvatar"), profileBtn = $("profileBtn"), profileModal = $("profileModal");
+  const profileForm = $("profileForm"), profileNickname = $("profileNickname"), profileEmail = $("profileEmail");
+  const profileSubmit = $("profileSubmit"), profileError = $("profileError"), avatarError = $("avatarError");
+  const avatarFile = $("avatarFile"), avatarPreview = $("avatarPreview");
+  const registerNickname = $("registerNickname"), registerEmail = $("registerEmail");
+  const registerAvatarFile = $("registerAvatarFile"), registerAvatarPreview = $("registerAvatarPreview");
+  const registerAvatarError = $("registerAvatarError");
 
   /* ==================== 工具函数 ==================== */
 
@@ -152,6 +174,8 @@
 
   /** 401（登录态失效）统一处理：返回 true 表示已接管 */
   function handleAuthError(e) {
+    // API 层已标记为过时的响应不应污染当前账号的界面。
+    if (e && e.stale) return true;
     if (!e || !e.auth) return false;
     toast("登录已失效，请重新登录", "error");
     showLogin();
@@ -186,7 +210,8 @@
   function closeConfirm(result) {
     if (confirmModal.hidden) return;
     confirmModal.hidden = true;
-    document.body.style.overflow = "";
+    // 关闭一层弹窗时仍需照顾其他可见弹窗。
+    syncScrollLock();
     if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
   }
 
@@ -206,51 +231,549 @@
     })(t0);
   }
 
+  /* ==================== 用户资料与头像（两处共用） ==================== */
+
+  /** 与 Java String.trim 对齐，避免前后端对首尾空白的解释不同。 */
+  function normalizeOptional(value) {
+    const normalized = String(value ?? "").replace(/^[\u0000- ]+|[\u0000- ]+$/g, "");
+    return normalized === "" ? null : normalized;
+  }
+
+  function readProfile(nicknameInput, emailInput) {
+    const nickname = normalizeOptional(nicknameInput.value);
+    const email = normalizeOptional(emailInput.value);
+    // novalidate 下必须主动 checkValidity，后端仍负责最终校验。
+    emailInput.value = email || "";
+    if (nickname && nickname.length > 50) throw new Error("昵称长度不能超过 50");
+    if (email && (email.length > 254 || !emailInput.checkValidity())) throw new Error("邮箱格式或长度不正确");
+    return { nickname, email };
+  }
+
+  function paintAvatar(container, url) {
+    const img = container.querySelector("img");
+    img.onload = null;
+    img.onerror = null;
+    img.hidden = true;
+    img.removeAttribute("src");
+    // 加载中和失败都展示固定背景，不反复查询或刷新永久 URL。
+    if (!url) return;
+    img.onload = () => { img.hidden = false; };
+    img.onerror = () => { img.hidden = true; };
+    img.src = url;
+  }
+
+  function renderIdentity() {
+    const user = state.user;
+    userName.hidden = !user;
+    logoutBtn.hidden = !user;
+    profileBtn.hidden = !user;
+    navAvatar.hidden = !user;
+    userName.textContent = user ? (normalizeOptional(user.nickname) || user.username) : "";
+    paintAvatar(navAvatar, user && user.avatar_url);
+    paintAvatar($("profileAvatar"), user && user.avatar_url);
+    $("profileUsername").textContent = user ? user.username : "";
+    // 这里绝不回填昵称/邮箱输入框，头像响应不能覆盖未保存草稿。
+  }
+
+  function clearSelectionImage(target, preview, input) {
+    target.selectionId += 1;
+    target.selecting = false;
+    if (target.previewUrl) URL.revokeObjectURL(target.previewUrl);
+    target.previewUrl = null;
+    target.pendingFile = null;
+    preview.removeAttribute("src");
+    preview.hidden = true;
+    input.value = "";
+  }
+
+  async function selectImage(file, target, preview, input, errorEl) {
+    hideError(errorEl);
+    clearSelectionImage(target, preview, input);
+    if (!file) return;
+    const selectionId = target.selectionId;
+    target.selecting = true;
+    let url = null;
+    try {
+      if (!file.size || file.size > 2 * 1024 * 1024) throw new Error("请选择 1 字节至 2 MB 的图片");
+      // 部分设备不提供 MIME，此时允许常见后缀进入预览；服务端仍以魔数为准。
+      const mimeOk = ["image/jpeg", "image/png"].includes(file.type);
+      const nameOk = !file.type && /\.(jpe?g|png)$/i.test(file.name);
+      if (!mimeOk && !nameOk) throw new Error("头像仅支持 JPG、PNG 格式");
+      url = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = resolve;
+        image.onerror = () => reject(new Error("图片无法预览，请重新选择"));
+        image.src = url;
+      });
+      if (selectionId !== target.selectionId) return;
+      target.pendingFile = file;
+      target.previewUrl = url;
+      preview.src = url;
+      preview.hidden = false;
+      url = null; // 所有权交给 target，取消、关闭、成功时再释放。
+    } catch (err) {
+      if (selectionId === target.selectionId) showError(errorEl, err.message);
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+      if (selectionId === target.selectionId) target.selecting = false;
+      input.value = ""; // 允许重新选择同一文件。
+    }
+  }
+
+  function profileBusy() {
+    return profileState.saving || profileState.uploading || profileState.removing || profileState.selecting;
+  }
+
+  function syncProfileControls() {
+    const busy = profileBusy();
+    profileModal.setAttribute("aria-busy", String(busy));
+    profileModal.querySelectorAll("button, input").forEach(el => { el.disabled = busy; });
+    $("avatarUpload").disabled = busy || !profileState.pendingFile;
+    $("avatarPending").hidden = !profileState.pendingFile;
+    profileSubmit.querySelector(".btn-spinner").hidden = !profileState.saving;
+    logoutBtn.disabled = busy;
+    apiSaveBtn.disabled = busy;
+  }
+
+  function syncScrollLock() {
+    document.body.style.overflow = (!authOverlay.hidden || !billModal.hidden
+      || !confirmModal.hidden || !profileModal.hidden) ? "hidden" : "";
+  }
+
+  function openProfile() {
+    if (!state.user || !billModal.hidden || !confirmModal.hidden) return;
+    profileNickname.value = state.user.nickname || "";
+    profileEmail.value = state.user.email || "";
+    hideError(profileError);
+    hideError(avatarError);
+    profileModal.hidden = false;
+    renderIdentity();
+    syncProfileControls();
+    syncScrollLock();
+    profileNickname.focus();
+  }
+
+  function closeProfile() {
+    if (profileBusy()) return;
+    clearSelectionImage(profileState, avatarPreview, avatarFile);
+    profileModal.hidden = true;
+    syncScrollLock();
+    if (state.user) profileBtn.focus();
+  }
+
+  function resetRegistration() {
+    registrationState.generation += 1;
+    clearSelectionImage(registrationState, registerAvatarPreview, registerAvatarFile);
+    registrationState.phase = "idle";
+    registrationState.registeredUserId = null;
+    registrationState.registeredUsername = null;
+    $("registerRecovery").hidden = true;
+    $("registerAvatarCancel").hidden = true;
+    $("registerCurrentAvatar").hidden = true;
+    registerNickname.value = "";
+    registerEmail.value = "";
+    hideError(registerAvatarError);
+  }
+
+  function resetFeatureSession() {
+    // 使旧异步响应失效，同时释放浏览器持有的 File/blob URL。
+    profileState.sessionGeneration += 1;
+    clearSelectionImage(profileState, avatarPreview, avatarFile);
+    profileState.saving = profileState.uploading = profileState.removing = false;
+    profileModal.hidden = true;
+    resetRegistration();
+    state.user = null;
+    renderIdentity();
+    syncProfileControls();
+  }
+
+  async function writeProfile(kind) {
+    if (profileBusy() || !state.user) return;
+    const errorEl = kind === "saving" ? profileError : avatarError;
+    hideError(errorEl);
+    let profile;
+    try {
+      if (kind === "saving") profile = readProfile(profileNickname, profileEmail);
+      if (kind === "uploading" && !profileState.pendingFile) return;
+    } catch (err) { showError(errorEl, err.message); return; }
+    const generation = profileState.sessionGeneration;
+    const token = API.getToken();
+    const base = API.getBase();
+    const userId = state.user.id;
+    const isCurrent = () => generation === profileState.sessionGeneration
+      && token === API.getToken() && base === API.getBase();
+    profileState[kind] = true;
+    syncProfileControls();
+    try {
+      const result = kind === "saving" ? await API.updateMe(profile)
+        : kind === "uploading" ? await API.uploadAvatar(profileState.pendingFile) : await API.removeAvatar();
+      if (!isCurrent()) return;
+      if (result.id !== userId) throw new Error("当前用户不一致，请重新登录");
+      state.user = result;
+      renderIdentity();
+      if (kind !== "saving") clearSelectionImage(profileState, avatarPreview, avatarFile);
+      toast(kind === "saving" ? "资料已保存" : kind === "uploading" ? "头像已更新" : "已恢复默认头像");
+    } catch (err) {
+      // request 在同会话 401 时已清令牌，故先检查代次再处理 auth，不能先用 token 拦掉它。
+      if (generation !== profileState.sessionGeneration || err.stale) return;
+      if (handleAuthError(err)) return;
+      if (!isCurrent()) return;
+      let message = err.message;
+      if (err.uncertain) {
+        try {
+          const actual = await API.me();
+          if (!isCurrent()) return;
+          if (actual.id !== userId) throw new Error("当前用户不一致");
+          state.user = actual;
+          renderIdentity();
+          message = "结果曾无法确认，已刷新当前已保存资料；请核对后决定是否再次提交。";
+        } catch (checkError) {
+          if (generation !== profileState.sessionGeneration || checkError.stale) return;
+          if (handleAuthError(checkError)) return;
+          message = "结果暂无法确认，查询当前资料也失败；请恢复连接后刷新页面，再打开资料核对。";
+        }
+      }
+      if (isCurrent()) showError(errorEl, message);
+      // 失败时保留图片和文字草稿；不自动重发写请求。
+    } finally {
+      if (generation === profileState.sessionGeneration) {
+        profileState[kind] = false;
+        syncProfileControls();
+      }
+    }
+  }
+
+  function bindProfileEvents() {
+    profileBtn.addEventListener("click", openProfile);
+    $("profileClose").addEventListener("click", closeProfile);
+    $("profileCancel").addEventListener("click", closeProfile);
+    profileModal.addEventListener("mousedown", e => { if (e.target === profileModal) closeProfile(); });
+    $("avatarChoose").addEventListener("click", () => { if (!profileBusy()) avatarFile.click(); });
+    avatarFile.addEventListener("change", async () => {
+      if (profileBusy()) return;
+      const selecting = selectImage(avatarFile.files[0], profileState, avatarPreview, avatarFile, avatarError);
+      syncProfileControls();
+      await selecting;
+      syncProfileControls();
+    });
+    $("avatarCancel").addEventListener("click", () => {
+      if (profileBusy()) return;
+      clearSelectionImage(profileState, avatarPreview, avatarFile);
+      syncProfileControls();
+    });
+    $("avatarUpload").addEventListener("click", () => writeProfile("uploading"));
+    $("avatarRemove").addEventListener("click", () => writeProfile("removing"));
+    profileForm.addEventListener("submit", e => { e.preventDefault(); writeProfile("saving"); });
+    $("appLoadRetry").addEventListener("click", () => {
+      enterApp().catch(err => { if (!handleAuthError(err)) toast("加载失败，可重试：" + err.message, "error"); });
+    });
+    // 另一个标签页切换账号或 API 地址时，旧上传不能回写本页面。
+    window.addEventListener("storage", e => {
+      if (["pl_token", "pl_api_base"].includes(e.key) || e.key === null) showLogin();
+    });
+    window.addEventListener("pagehide", () => {
+      clearSelectionImage(profileState, avatarPreview, avatarFile);
+      clearSelectionImage(registrationState, registerAvatarPreview, registerAvatarFile);
+    });
+  }
+
   /* ==================== 登录 / 注册 ==================== */
 
   let authMode = "login";   // login | register
+  // 与 phase 分开：一个控制网络/提交互斥，一个记录业务完成阶段。
+  let authSubmitting = false;
 
   function showLogin() {
+    resetFeatureSession();
+    // 会话代次已更新，旧请求的 finally 不应重新控制新登录表单。
+    authSubmitting = false;
+    authPassword.value = "";
+    setAuthMode("login");
     authOverlay.hidden = false;
-    document.body.style.overflow = "hidden";
     authApiBase.value = API.getBase();   // 回填当前后端地址，方便确认/修改
+    syncScrollLock();
     setTimeout(() => authUsername.focus(), 90);
   }
 
   function hideLogin() {
     authOverlay.hidden = true;
-    document.body.style.overflow = "";
+    syncScrollLock();
   }
 
-  function setAuthMode(mode) {
+  function setAuthMode(mode, { preserve = false } = {}) {
+    if (!preserve) resetRegistration();
     authMode = mode;
     const isLogin = mode === "login";
     authTitle.textContent = isLogin ? "登录口袋账本" : "注册新账号";
-    authSubmit.querySelector(".btn-text").textContent = isLogin ? "登录" : "注册并登录";
     authToggleBtn.textContent = isLogin ? "没有账号？注册一个" : "已有账号？去登录";
     authPassword.autocomplete = isLogin ? "current-password" : "new-password";
     hideError(authError);
+    syncRegistrationControls();
   }
 
   function setAuthSubmitting(on) {
-    authSubmit.disabled = on;
-    authSubmit.querySelector(".btn-spinner").hidden = !on;
-    authSubmit.querySelector(".btn-text").textContent = on
-      ? "请稍候…"
-      : (authMode === "login" ? "登录" : "注册并登录");
+    authSubmitting = on;
+    syncRegistrationControls();
+  }
+
+  function syncRegistrationControls() {
+    const phase = registrationState.phase;
+    const busy = authSubmitting || registrationState.selecting;
+    const avatarStage = ["avatar_failed", "uploading_avatar"].includes(phase);
+    const recovering = ["login_required", "registration_unknown"].includes(phase) || avatarStage;
+    const lockedAccount = registrationState.registeredUserId !== null;
+    $("registerOptionalFields").hidden = authMode !== "register" && !avatarStage;
+    $("registerRecovery").hidden = !recovering;
+    authUsername.disabled = busy || avatarStage;
+    authUsername.readOnly = lockedAccount || phase === "registration_unknown";
+    authPassword.disabled = busy || avatarStage;
+    registerNickname.disabled = busy || lockedAccount;
+    registerEmail.disabled = busy || lockedAccount;
+    $("registerAvatarChoose").disabled = busy;
+    $("registerAvatarCancel").disabled = busy;
+    $("registerAvatarCancel").hidden = !registrationState.pendingFile && registerAvatarError.hidden;
+    registerAvatarFile.disabled = busy;
+    authSubmit.hidden = avatarStage;
+    authSubmit.disabled = busy;
+    authSubmit.querySelector(".btn-spinner").hidden = !authSubmitting;
+    authSubmit.querySelector(".btn-text").textContent = busy ? "请稍候…"
+      : authMode === "register" ? "注册并登录" : "登录";
+    authToggleBtn.disabled = busy || phase !== "idle";
+    // 在已创建账号的恢复过程中固定后端，换后端需要明确放弃本次续传。
+    authApiBase.disabled = authApiSaveBtn.disabled = busy || phase !== "idle";
+    $("registerAvatarRetry").hidden = !avatarStage;
+    $("registerAvatarSkip").hidden = !avatarStage;
+    $("registerAvatarRetry").disabled = busy || !registrationState.pendingFile;
+    $("registerAvatarSkip").disabled = busy;
+    $("registerAbandon").disabled = busy;
+    logoutBtn.disabled = busy || profileBusy();
+    apiSaveBtn.disabled = busy || profileBusy();
+  }
+
+  /** 显示服务器当前头像，仅更新已保存展示，不覆盖待上传预览。 */
+  function showRegisteredAvatar(user) {
+    state.user = user;
+    $("registerCurrentAvatar").hidden = false;
+    paintAvatar($("registerCurrentAvatar"), user.avatar_url);
+  }
+
+  async function finishRegistration(user, message) {
+    registrationState.phase = "complete";
+    clearSelectionImage(registrationState, registerAvatarPreview, registerAvatarFile);
+    authPassword.value = "";
+    await enterApp(user);
+    // enterApp 的数据加载失败已经单独提示，不再退回注册。
+    if (state.user && state.user.id === user.id && authOverlay.hidden) toast(message);
+  }
+
+  async function uploadRegisteredAvatar() {
+    if (!registrationState.pendingFile || !registrationState.registeredUserId) return;
+    const file = registrationState.pendingFile;
+    const userId = registrationState.registeredUserId;
+    const generation = registrationState.generation;
+    const session = profileState.sessionGeneration;
+    const token = API.getToken(), base = API.getBase();
+    const alive = () => generation === registrationState.generation && session === profileState.sessionGeneration;
+    const current = () => alive() && token === API.getToken() && base === API.getBase();
+    setAuthSubmitting(true);
+    registrationState.phase = "uploading_avatar";
+    syncRegistrationControls();
+    try {
+      // 每次重试之前确认登录者仍然是刚注册的用户，不能只比对用户名。
+      const actual = await API.me();
+      if (!current()) return;
+      if (actual.id !== userId) {
+        showLogin();
+        showError(authError, "当前账号与刚注册的账号不同，已取消头像续传");
+        return;
+      }
+      showRegisteredAvatar(actual);
+      const uploaded = await API.uploadAvatar(file);
+      if (!current()) return;
+      if (uploaded.id !== userId) throw new Error("头像响应用户不一致，请重新登录");
+      await finishRegistration(uploaded, "注册成功，头像已设置");
+    } catch (err) {
+      if (!alive() || err.stale) return;
+      if (handleAuthError(err)) return;
+      if (!current()) return;
+      registrationState.phase = "avatar_failed";
+      let message = "账号已注册并登录，头像上传未完成：" + err.message;
+      // 超时可能已经提交，因此先展示服务器当前状态，再允许用户决定是否替换。
+      if (err.uncertain) {
+        try {
+          const actual = await API.me();
+          if (!current()) return;
+          if (actual.id !== userId) { showLogin(); return; }
+          showRegisteredAvatar(actual);
+          message = "账号已注册并登录。已查询服务器当前头像，请核对；可以确认再次上传，也可以跳过。";
+        } catch (checkError) {
+          if (!alive() || checkError.stale) return;
+          if (handleAuthError(checkError)) return;
+          message = "账号已创建，头像结果与当前登录状态暂无法确认；恢复连接后点击重试，将先核对账号。";
+        }
+      }
+      if (current()) $("registerStatus").textContent = message;
+    } finally {
+      if (alive()) setAuthSubmitting(false);
+    }
+  }
+
+  async function skipRegisteredAvatar() {
+    if (authSubmitting || registrationState.selecting) return;
+    const generation = registrationState.generation;
+    const session = profileState.sessionGeneration;
+    const token = API.getToken(), base = API.getBase();
+    setAuthSubmitting(true);
+    try {
+      const user = await API.me();
+      if (generation !== registrationState.generation || session !== profileState.sessionGeneration
+          || token !== API.getToken() || base !== API.getBase()) return;
+      if (user.id !== registrationState.registeredUserId) {
+        showLogin();
+        showError(authError, "当前账号已变化，已取消头像续传");
+        return;
+      }
+      // 跳过是用户明确选择，此时释放待上传图片；以后可以重新选择。
+      await finishRegistration(user, "注册成功，可稍后设置头像");
+    } catch (err) {
+      if (generation !== registrationState.generation || err.stale) return;
+      if (!handleAuthError(err)) $("registerStatus").textContent = "暂时无法确认当前账号：" + err.message;
+    } finally {
+      if (generation === registrationState.generation) setAuthSubmitting(false);
+    }
+  }
+
+  /** 唯一的认证提交入口：注册 → 登录 →（有头像时）上传头像，任何一步失败都不重复建号。 */
+  async function submitAuth(event) {
+    event.preventDefault();
+    if (authSubmitting || registrationState.selecting
+        || ["avatar_failed", "uploading_avatar", "complete"].includes(registrationState.phase)) return;
+    const username = authUsername.value.trim();
+    // 保持后端既有密码首尾空白处理，并用 UTF-8 字节数检查 BCrypt 上限。
+    let password = authPassword.value.trim();
+    const creating = authMode === "register";
+    let profile;
+    try {
+      if (!username || !password) throw new Error("请输入用户名和密码");
+      if (creating) {
+        if (registrationState.phase !== "idle") return;
+        // 图片校验失败后必须重新选图或明确取消，不能悄悄当成“未选头像”建号。
+        if (!registerAvatarError.hidden) throw new Error("请重新选择合法头像，或点击取消选择后再注册");
+        if (username.length < 2 || username.length > 50) throw new Error("用户名长度需在 2~50 个字符之间");
+        if (password.length < 8 || password.length > 64 || new TextEncoder().encode(password).length > 72) {
+          throw new Error("密码需 8~64 个字符，且 UTF-8 编码不超过 72 字节");
+        }
+        profile = readProfile(registerNickname, registerEmail);
+      }
+    } catch (err) { showError(authError, err.message); password = ""; return; }
+
+    const generation = registrationState.generation;
+    const session = profileState.sessionGeneration;
+    const base = API.getBase();
+    let expectedToken = API.getToken();
+    const alive = () => generation === registrationState.generation && session === profileState.sessionGeneration
+      && base === API.getBase();
+    const current = () => alive() && expectedToken === API.getToken();
+    setAuthSubmitting(true);
+    hideError(authError);
+    try {
+      if (creating) {
+        registrationState.phase = "registering";
+        syncRegistrationControls();
+        try {
+          const created = await API.register(username, password, profile);
+          if (!current()) return;
+          if (!created || !created.id) throw new Error("注册响应不完整，结果暂无法确认");
+          registrationState.registeredUserId = created.id;
+          registrationState.registeredUsername = created.username;
+          registrationState.phase = "registered";
+        } catch (err) {
+          if (!alive() || err.stale) return;
+          if (err.auth) { handleAuthError(err); return; }
+          if (!current()) return;
+          if ([400, 409, 422].includes(err.httpStatus)) {
+            // 明确拒绝才允许修改资料后重新提交注册。
+            registrationState.phase = "idle";
+            showError(authError, err.message);
+          } else {
+            // 没有可靠用户 ID 时绝不自动续传到随后登录的账号。
+            clearSelectionImage(registrationState, registerAvatarPreview, registerAvatarFile);
+            registrationState.phase = "registration_unknown";
+            registrationState.registeredUsername = username;
+            setAuthMode("login", { preserve: true });
+            $("registerStatus").textContent = "注册结果暂无法确认，请重新输入密码登录确认；头像需登录后重新选择。";
+          }
+          return;
+        }
+      }
+
+      if (registrationState.registeredUserId) registrationState.phase = "logging_in";
+      await API.login(username, password, current);
+      if (!alive()) return;
+      expectedToken = API.getToken();
+      password = "";
+      authPassword.value = "";
+      const actual = await API.me();
+      if (!current()) return;
+      if (registrationState.registeredUserId && actual.id !== registrationState.registeredUserId) {
+        showLogin();
+        showError(authError, "登录账号与刚注册的账号不同，已取消头像续传");
+        return;
+      }
+      if (registrationState.pendingFile && registrationState.registeredUserId) {
+        if (creating) {
+          // 首次注册交互自动上传，失败后的手动登录必须由用户确认续传。
+          await uploadRegisteredAvatar();
+        } else {
+          registrationState.phase = "avatar_failed";
+          showRegisteredAvatar(actual);
+          $("registerStatus").textContent = "账号已登录，请确认上传之前选择的头像，或暂时跳过。";
+        }
+      } else {
+        await finishRegistration(actual, creating ? "注册成功，已登录" : "登录成功");
+      }
+    } catch (err) {
+      if (!alive() || err.stale) return;
+      if (handleAuthError(err)) return;
+      if (!current()) return;
+      if (registrationState.registeredUserId) {
+        registrationState.phase = "login_required";
+        setAuthMode("login", { preserve: true });
+        $("registerStatus").textContent = "账号已注册成功，请重新输入密码登录后继续设置头像。";
+      }
+      showError(authError, err.message);
+    } finally {
+      password = "";
+      if (alive()) {
+        authPassword.value = "";
+        setAuthSubmitting(false);
+      }
+    }
   }
 
   /** 登录成功后的入场：拿用户 → 显示身份 → 拉分类字典 → 加载数据 */
-  async function enterApp() {
-    state.user = await API.me();
-    userName.textContent = state.user.username;
-    userName.hidden = false;
-    logoutBtn.hidden = false;
+  async function enterApp(knownUser = null) {
+    const generation = profileState.sessionGeneration;
+    const token = API.getToken();
+    const user = knownUser || await API.me();
+    if (generation !== profileState.sessionGeneration || token !== API.getToken()) return;
+    state.user = user;
+    renderIdentity();
     hideLogin();
-    await loadCategories();
-    populateCategoryFilter();               // 分类筛选下拉（只依赖静态字典，登录期间渲染一次）
-    setDateMode("single", { reload: false });   // 默认单日（今天）
-    refresh();
+    try {
+      await loadCategories();
+      if (generation !== profileState.sessionGeneration || token !== API.getToken()) return;
+      populateCategoryFilter();               // 分类筛选下拉（只依赖静态字典，登录期间渲染一次）
+      setDateMode("single", { reload: false });   // 默认单日（今天）
+      $("appLoadRetry").hidden = true;
+      refresh();
+    } catch (err) {
+      if (generation !== profileState.sessionGeneration) return;
+      if (handleAuthError(err)) return;
+      $("appLoadRetry").hidden = false;
+      toast("账号已登录，页面数据加载失败，可点击重新加载", "error");
+    }
   }
 
   async function loadCategories() {
@@ -786,7 +1309,8 @@
 
   function closeModal() {
     billModal.hidden = true;
-    document.body.style.overflow = "";
+    // 关闭一层弹窗时仍需照顾其他可见弹窗。
+    syncScrollLock();
   }
 
   function setSubmitting(on) {
@@ -864,13 +1388,47 @@
   /* ==================== 事件绑定 ==================== */
 
   function bindEvents() {
+    // 所有资料事件在页面启动时集中绑定，打开弹窗不重复绑定。
+    bindProfileEvents();
+
     // 登录 / 注册
+    // 认证提交只绑定一次，旧 async submit 监听必须删除。
+    authForm.addEventListener("submit", submitAuth);
     authToggleBtn.addEventListener("click", () => {
+      if (authSubmitting || registrationState.selecting || registrationState.phase !== "idle") return;
       setAuthMode(authMode === "login" ? "register" : "login");
+    });
+    $("registerAvatarChoose").addEventListener("click", () => {
+      if (!authSubmitting && !registrationState.selecting) registerAvatarFile.click();
+    });
+    registerAvatarFile.addEventListener("change", async () => {
+      if (authSubmitting || registrationState.selecting) return;
+      const selecting = selectImage(registerAvatarFile.files[0], registrationState,
+        registerAvatarPreview, registerAvatarFile, registerAvatarError);
+      syncRegistrationControls();
+      await selecting;
+      syncRegistrationControls();
+    });
+    $("registerAvatarCancel").addEventListener("click", () => {
+      if (authSubmitting || registrationState.selecting) return;
+      clearSelectionImage(registrationState, registerAvatarPreview, registerAvatarFile);
+      hideError(registerAvatarError);
+      syncRegistrationControls();
+    });
+    $("registerAvatarRetry").addEventListener("click", () => {
+      if (!authSubmitting && !registrationState.selecting) uploadRegisteredAvatar();
+    });
+    $("registerAvatarSkip").addEventListener("click", skipRegisteredAvatar);
+    $("registerAbandon").addEventListener("click", () => {
+      if (authSubmitting || registrationState.selecting) return;
+      API.logout();
+      showLogin();
     });
 
     // 登录弹窗内直接改后端地址：保存后立即重连检测，不刷新页面、不要求先登录
     authApiSaveBtn.addEventListener("click", () => {
+      // 恢复流程不能悄悄切换到另一个后端继续上传。
+      if (authSubmitting || registrationState.selecting || registrationState.phase !== "idle") return;
       const v = authApiBase.value.trim();
       if (!v) { toast("请输入后端地址", "error"); return; }
       API.setBase(v);
@@ -879,30 +1437,10 @@
       checkHealth();
     });
 
-    authForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const username = authUsername.value.trim();
-      const password = authPassword.value;
-      if (!username || !password) { showError(authError, "请输入用户名和密码"); return; }
-
-      setAuthSubmitting(true);
-      try {
-        if (authMode === "register") {
-          await API.register(username, password);
-          toast("注册成功，已自动登录");
-        }
-        await API.login(username, password);
-        authPassword.value = "";
-        await enterApp();
-      } catch (err) {
-        showError(authError, err.message);
-      } finally {
-        setAuthSubmitting(false);
-      }
-    });
-
     // 退出登录：清 token 后整页重载，所有状态随之归零
     logoutBtn.addEventListener("click", () => {
+      // 先使旧响应失效，再清令牌、刷新页面。
+      resetFeatureSession();
       API.logout();
       location.reload();
     });
@@ -1232,6 +1770,19 @@
     // 快捷键：N 记一笔，Esc 关闭弹层（登录浮层不可关闭、快捷键也不响应）
     document.addEventListener("keydown", (e) => {
       if (!authOverlay.hidden) return;
+      // 资料弹窗的键盘操作在其内部处理，忙碌时 Escape 也不会撤销已发请求。
+      if (!profileModal.hidden) {
+        if (e.key === "Escape") { e.preventDefault(); closeProfile(); }
+        if (e.key === "Tab") {
+          const nodes = [...profileModal.querySelectorAll("button:not(:disabled), input:not(:disabled):not([type=file])")]
+            .filter(el => el.getClientRects().length);
+          const first = nodes[0], last = nodes[nodes.length - 1];
+          if (!first) { e.preventDefault(); return; }
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+        return;
+      }
       if (e.key === "Escape") {
         if (!confirmModal.hidden) return closeConfirm(false);
         if (!billModal.hidden) return closeModal();

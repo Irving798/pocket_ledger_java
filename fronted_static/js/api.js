@@ -1,11 +1,15 @@
 /* ============================================================
-   口袋账本 —— API 层（v4.0）
-   认证：POST /auth/register、POST /auth/login、GET /auth/me
+   口袋账本 —— API 层（v4.1）
+   认证：POST /auth/register、POST /auth/login、GET /auth/me、
+         PUT  /auth/me、POST /auth/me/avatar（multipart）、
+         DELETE /auth/me/avatar
    分类：GET  /categories?type=    （只读字典）
    账单：POST /bills/add、GET /bills/list、GET /bills/{id}、
          PUT  /bills/{id}、DELETE /bills
    统一返回结构：Result { code, message, data }
    认证方式：localStorage 存 JWT，请求头带 Authorization: Bearer <token>
+   v4.1：request 同时支持 JSON 与 FormData；写请求结果不确定时标记
+         uncertain，不自动重发；401 区分当前会话与过时会话（stale）
    ============================================================ */
 
 const API = (() => {
@@ -28,50 +32,56 @@ const API = (() => {
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
   function clearToken() { localStorage.removeItem(TOKEN_KEY); }
 
-  /**
-   * 统一请求封装：
-   * - 自动拼接 baseURL、携带 Authorization、序列化 JSON body
-   * - 解包 Result 信封；code !== 200 或 HTTP 非 2xx 时抛出带后端 message 的 Error
-   * - 401 视为登录态失效：清除本地 token，并给 Error 打上 .auth 标记（登录接口自身除外）
-   */
+  /** JSON 与文件共用认证、超时和统一响应处理。 */
   async function request(path, { method = "GET", body, timeout = 12000 } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-
-    const headers = {};
-    if (body !== undefined) headers["Content-Type"] = "application/json";
     const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    let res;
+    const base = getBase();
+    const headers = {};
+    const isFormData = body instanceof FormData;
+    if (body !== undefined && !isFormData) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = "Bearer " + token;
+    let response;
     try {
-      res = await fetch(getBase() + path, {
+      response = await fetch(base + path, {
         method,
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        // multipart 的 boundary 必须由浏览器产生，不能手动指定 Content-Type。
+        body: body === undefined ? undefined : (isFormData ? body : JSON.stringify(body)),
         signal: controller.signal,
-        cache: "no-store",   // GET 一律绕过缓存，保证增删改后读到最新数据
+        cache: "no-store",
       });
-    } catch (e) {
-      if (e.name === "AbortError") throw new Error("请求超时，请检查后端服务是否正常运行");
-      throw new Error(`无法连接后端服务，请确认后端已启动（当前地址 ${getBase()}，可用右上角齿轮修改）`);
+      let payload = null;
+      try { payload = await response.json(); } catch { /* 错误页可能不是 JSON。 */ }
+      if (!response.ok || !payload || payload.code !== 200) {
+        const err = new Error((payload && payload.message) || ("请求失败（HTTP " + response.status + "）"));
+        err.httpStatus = response.status;
+        // 5xx 或成功状态却无法解包时，写请求是否完成可能无法确认。
+        err.uncertain = response.status >= 500 || (response.ok && !payload);
+        if (response.status === 401 && !path.startsWith("/auth/login")) {
+          if (getToken() === token && getBase() === base) {
+            clearToken();
+            err.auth = true;
+          } else {
+            err.stale = true; // 旧会话的 401 不能清掉新账号的令牌。
+          }
+        }
+        throw err;
+      }
+      return payload.data;
+    } catch (err) {
+      if (err.httpStatus) throw err;
+      const wrapped = new Error(err.name === "AbortError"
+        ? "请求超时，操作结果暂无法确认"
+        : "网络中断，操作结果暂无法确认，请检查后端连接");
+      wrapped.uncertain = true;
+      // 无 HTTP 响应不伪造状态码，更不自动重发注册或上传。
+      throw wrapped;
     } finally {
+      // 计时范围覆盖响应体读取，不能收到响应头就提前取消超时。
       clearTimeout(timer);
     }
-
-    let payload = null;
-    try { payload = await res.json(); } catch { /* 非 JSON 响应，忽略 */ }
-
-    const message = (payload && (payload.message || payload.detail)) || `请求失败（HTTP ${res.status}）`;
-    if (!res.ok || (payload && typeof payload.code === "number" && payload.code !== 200)) {
-      const err = new Error(message);
-      if (res.status === 401 && !path.startsWith("/auth/login")) {
-        if (token) clearToken();
-        err.auth = true;
-      }
-      throw err;
-    }
-    return payload ? payload.data : null;
   }
 
   /** 拼接查询参数（跳过空值） */
@@ -86,12 +96,23 @@ const API = (() => {
 
   /* ---------- 认证 ---------- */
 
-  function register(username, password) {
-    return request("/auth/register", { method: "POST", body: { username, password } });
+  /** 第三个参数可省略，继续兼容旧的两参数注册调用。 */
+  function register(username, password, profile = {}) {
+    return request("/auth/register", {
+      method: "POST",
+      body: { username, password, nickname: profile.nickname ?? null, email: profile.email ?? null },
+    });
   }
 
-  async function login(username, password) {
+  async function login(username, password, isCurrent = () => true) {
     const data = await request("/auth/login", { method: "POST", body: { username, password } });
+    // 页面提供会话代次检查，防止旧登录响应覆盖后来切换的账号。
+    if (!isCurrent()) {
+      const err = new Error("登录会话已变化，请重新操作");
+      err.stale = true;
+      throw err;
+    }
+    if (!data || !data.access_token) throw new Error("登录响应缺少访问令牌");
     setToken(data.access_token);
     return data;
   }
@@ -99,6 +120,23 @@ const API = (() => {
   function logout() { clearToken(); }
 
   function me() { return request("/auth/me"); }
+
+  /** 资料 PUT 始终只发两个字段，不能把完整 state.user 原样提交。 */
+  function updateMe(profile) {
+    return request("/auth/me", { method: "PUT", body: {
+      nickname: profile.nickname, email: profile.email,
+    } });
+  }
+
+  function uploadAvatar(file) {
+    const form = new FormData();
+    form.append("file", file);
+    return request("/auth/me/avatar", { method: "POST", body: form, timeout: 30000 });
+  }
+
+  function removeAvatar() {
+    return request("/auth/me/avatar", { method: "DELETE" });
+  }
 
   /* ---------- 分类（只读字典） ---------- */
 
@@ -175,7 +213,8 @@ const API = (() => {
 
   return {
     getBase, setBase, getToken, setToken, clearToken,
-    register, login, logout, me,
+    // 新方法必须导出，app.js 才能调用。
+    register, login, logout, me, updateMe, uploadAvatar, removeAvatar,
     listCategories,
     listBills, listAllBills, getBill, addBill, updateBill, deleteBills, health,
   };
